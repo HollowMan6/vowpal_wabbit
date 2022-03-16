@@ -143,6 +143,7 @@ public:
 
   parser* example_parser;
   std::thread parse_thread;
+  std::map<std::string, int> namespace_counter;
 
   AllReduceType all_reduce_type;
   AllReduce* all_reduce;

@@ -6,6 +6,7 @@
 
 #include <cctype>
 #include <cmath>
+#include <iostream>
 
 #include "constant.h"
 #include "future_compat.h"
@@ -42,6 +43,16 @@ int read_features_string(VW::workspace* all, io_buf& buf, VW::v_array<VW::exampl
   if (num_bytes_consumed < 1)
   {
     // This branch will get hit once we have reached EOF of the input device.
+    // Output the namespaces that we have accumulated so far.
+    std::cout << "---" << std::endl;
+    std::cout << "Total counts: ";
+    for (auto it = all->namespace_counter.begin(); it != all->namespace_counter.end(); ++it) {
+      std::cout << it->first << ":" << it->second;
+      if (std::next(it) == all->namespace_counter.end())
+        std::cout << std::endl;
+      else
+        std::cout << ", ";
+    }
     return static_cast<int>(num_bytes_consumed);
   }
 
@@ -75,6 +86,8 @@ public:
   uint32_t _hash_seed;
   uint64_t _parse_mask;
   std::array<std::vector<std::shared_ptr<feature_dict>>, NUM_NAMESPACES>* _namespace_dictionaries;
+  std::map<std::string, int>* _namespace_counter;
+  std::map<std::string, int>* _feature_counter;
   VW::io::logger* logger;
 
   ~TC_parser() {}
@@ -176,6 +189,12 @@ public:
     else
     {
       // maybeFeature --> 'String' FeatureValue
+      std::string ns = std::string{_base};
+      auto it = _feature_counter->find(ns);
+      if (it == _feature_counter->end())
+        _feature_counter->insert(std::make_pair(ns, 1));
+      else
+        _feature_counter->insert(std::make_pair(ns, it->second++));
       VW::string_view feature_name = read_name();
       VW::string_view string_feature_value;
 
@@ -391,7 +410,8 @@ public:
       if (_redefine_some) _index = (*_redefine)[_index];  // redefine _index
       if (_ae->feature_space[_index].size() == 0) _new_index = true;
       VW::string_view name = read_name();
-      if (audit) { _base = name; }
+      // if (audit) { _base = name; }
+      _base = name;
       _channel_hash = _p->hasher(name.data(), name.length(), this->_hash_seed);
       nameSpaceInfoValue();
     }
@@ -426,12 +446,12 @@ public:
       // NameSpace --> ListFeatures
       _index = static_cast<unsigned char>(' ');
       if (_ae->feature_space[_index].size() == 0) _new_index = true;
-      if (audit)
-      {
+      // if (audit)
+      // {
         // TODO: c++17 allows VW::string_view literals, eg: " "sv
         static const char* space = " ";
         _base = space;
-      }
+      // }
       _channel_hash = this->_hash_seed == 0 ? 0 : uniform_hash("", 0, this->_hash_seed);
       _ae->feature_space[_index].start_ns_extent(_channel_hash);
       did_start_extent = true;
@@ -456,6 +476,16 @@ public:
 
     // If the namespace was empty this will handle it internally.
     if (did_start_extent) { _ae->feature_space[_index].end_ns_extent(); }
+    // namespaces counter set.
+    std::string ns = std::string{_base};
+    auto it = _namespace_counter->find(ns);
+    if (it == _namespace_counter->end())
+      _namespace_counter->insert(std::make_pair(ns, 1));
+    else
+      _namespace_counter->insert(std::make_pair(ns, it->second++));
+    auto itr = _feature_counter->find(ns);
+    if (itr == _feature_counter->end())
+      _feature_counter->insert(std::make_pair(ns, 0));
   }
 
   inline FORCE_INLINE void listNameSpace()
@@ -485,10 +515,25 @@ public:
       this->_affix_features = &all.affix_features;
       this->_spelling_features = &all.spelling_features;
       this->_namespace_dictionaries = &all.namespace_dictionaries;
+      this->_namespace_counter = &all.namespace_counter;
+      this->_feature_counter = new std::map<std::string, int>;
       this->_hash_seed = all.hash_seed;
       this->_parse_mask = all.parse_mask;
       this->logger = &all.logger;
       listNameSpace();
+
+      // print all the namespaces and corresponding feature counter in one example
+      std::cout << "Example: ";
+      if (this->_feature_counter->begin() == this->_feature_counter->end())
+        std::cout << std::endl;
+      else
+        for (auto it = this->_feature_counter->begin(); it != this->_feature_counter->end(); ++it) {
+          std::cout << it->first << ":" << it->second;
+          if (std::next(it) == this->_feature_counter->end())
+            std::cout << std::endl;
+          else
+            std::cout << ", ";
+        }
     }
     else
     {
