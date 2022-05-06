@@ -370,6 +370,11 @@ if (BUILD_EXTERNAL_PARSER)
   target_link_libraries(vw_core PRIVATE ${EXTERNAL_PARSER_LIBS})
 endif()
 
+if(BUILD_CSV)
+  target_link_libraries(vw_core PRIVATE vw_csv_parser)
+  target_compile_definitions(vw_core PUBLIC BUILD_CSV)
+endif()
+
 if(BUILD_FLATBUFFERS)
   target_link_libraries(vw_core PRIVATE vw_fb_parser)
   target_compile_definitions(vw_core PUBLIC BUILD_FLATBUFFERS)

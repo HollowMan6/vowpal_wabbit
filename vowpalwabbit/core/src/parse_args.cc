@@ -408,6 +408,9 @@ input_options parse_source(VW::workspace& all, options_i& options)
                      "hashed as A^B^C."))
       .add(make_option("flatbuffer", parsed_options.flatbuffer)
                .help("Data file will be interpreted as a flatbuffer file")
+               .experimental())
+      .add(make_option("csv", parsed_options.csv)
+               .help("Data file will be interpreted as a csv file")
                .experimental());
 #ifdef BUILD_EXTERNAL_PARSER
   VW::external::parser::set_parse_args(input_options, parsed_options);

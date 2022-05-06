@@ -28,6 +28,7 @@ struct input_options
   bool compressed;
   bool chain_hash_json;
   bool flatbuffer = false;
+  bool csv = false;
 #ifdef BUILD_EXTERNAL_PARSER
   // pointer because it is an incomplete type
   std::unique_ptr<VW::external::parser_options> ext_opts;
