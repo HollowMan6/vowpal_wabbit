@@ -75,7 +75,9 @@ int VW_getpid() { return (int)::GetCurrentProcessId(); }
 #ifdef BUILD_FLATBUFFERS
 #  include "vw/fb_parser/parse_example_flatbuffer.h"
 #endif
-
+#ifdef BUILD_CSV
+#  include "vw/csv_parser/parse_example_csv.h"
+#endif
 // OSX doesn't expects you to use IPPROTO_TCP instead of SOL_TCP
 #if !defined(SOL_TCP) && defined(IPPROTO_TCP)
 #  define SOL_TCP IPPROTO_TCP
@@ -616,6 +618,13 @@ void enable_sources(VW::workspace& all, bool quiet, size_t passes, input_options
       {
         all.flat_converter = VW::make_unique<VW::parsers::flatbuffer::parser>();
         all.example_parser->reader = VW::parsers::flatbuffer::flatbuffer_to_examples;
+      }
+#endif
+#ifdef BUILD_CSV
+      else if (input_options.csv)
+      {
+        all.csv_converter = VW::make_unique<VW::parsers::csv::parser>();
+        all.example_parser->reader = VW::parsers::csv::csv_to_examples;
       }
 #endif
       else

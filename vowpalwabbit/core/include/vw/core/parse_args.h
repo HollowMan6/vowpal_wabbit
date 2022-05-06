@@ -28,6 +28,7 @@ struct input_options
   bool compressed;
   bool chain_hash_json;
   bool flatbuffer = false;
+  bool csv = false;
 };
 
 void parse_modules(VW::config::options_i& options, VW::workspace& all);
