@@ -411,7 +411,18 @@ input_options parse_source(VW::workspace& all, options_i& options)
                .experimental())
       .add(make_option("csv", parsed_options.csv)
                .help("Data file will be interpreted as a csv file")
-               .experimental());
+               .experimental())
+      .add(make_option("separator", all.separator).short_name("s").help("CSV Parser: Explicitly specify field separator (Perl-regex) "
+                       "Default: ',' (comma)").experimental())
+      .add(make_option("no_header", all.no_header).short_name("H").help("CSV Parser: First line is NOT a header. By default, csv files "
+                       "are assumed to have a header with feature names").experimental())
+      // .add(make_option("tag", all.tag).help("Use the specified integer index as the Id column-number"
+      //                  "(i.e. example ID rather than an input feature)"
+      //                  "This moves its contents into the vw identifying tag"
+      //                  "and drops it from the input features.").experimental())
+      .add(make_option("label", all.label).help("CSV Parser: Use the specified integer index as the label column-number "
+                       "The label (aka response) is always dropped from the "
+                       "input features. Default: -1 (last column)").experimental());
 #ifdef BUILD_EXTERNAL_PARSER
   VW::external::parser::set_parse_args(input_options, parsed_options);
 #endif

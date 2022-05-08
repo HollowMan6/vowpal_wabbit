@@ -315,6 +315,12 @@ std::unique_ptr<VW::parsers::csv::parser> csv_converter;
   bool no_daemon = false;  // If a model was saved in daemon or active learning mode, force it to accept local input
                            // when loaded instead.
 
+  // CSV parsing configurations
+  std::string separator = ",";
+  bool no_header = false;
+  // int tag = 0;
+  int32_t label = -1;
+
   // runtime accounting variables.
   float initial_t;
   float eta;  // learning rate control.

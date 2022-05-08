@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include "vw/core/cb.h"
-#include "vw/core/v_array.h"
-#include "vw/core/global_data.h"
 #include "vw/common/text_utils.h"
+#include "vw/core/global_data.h"
+#include "vw/core/v_array.h"
 
 #include <vector>
+#include <map>
 
 namespace VW
 {
@@ -23,23 +23,23 @@ class parser
 {
 public:
   parser() = default;
-  char separator = ',';
-  bool with_header = true;
-  int conf_label_index = -1;
-  int label_index;
 
   int parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae);
 
 private:
-  std::vector<VW::string_view> _header;
+  std::vector<std::string> _header;
   uint64_t _channel_hash;
+  int label_index;
+  bool has_checked_label_type = false;
+  bool is_multiclass_label = false;
+  std::map<VW::string_view, int> multiclass_label_counter;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line);
   void parse_features(VW::workspace* all, features& fs, std::vector<VW::string_view> csv_line, const char* ns);
-  std::vector<VW::string_view> split(VW::string_view sv, char ch);
+  std::vector<VW::string_view> split(VW::string_view sv, std::string ch);
 };
 }  // namespace csv
 }  // namespace parsers
