@@ -121,6 +121,14 @@ Input Options:
     --flatbuffer                            Data file will be interpreted as a flatbuffer file (type: bool,
                                             experimental)
     --csv                                   Data file will be interpreted as a csv file (type: bool, experimental)
+    -s, --separator arg                     CSV Parser: Explicitly specify field separator (Perl-regex) Default:
+                                            ',' (comma) (type: str, experimental)
+    -H, --no_header                         CSV Parser: First line is NOT a header. By default, csv files
+                                            are assumed to have a header with feature names (type: bool,
+                                            experimental)
+    --label arg                             CSV Parser: Use the specified integer index as the label column-number
+                                            The label (aka response) is always dropped from the input features.
+                                            Default: -1 (last column) (type: int, experimental)
 Logging Options:
     --quiet                                 Don't output diagnostics and progress updates. Supplying this
                                             implies --log_level off and --driver_output_off. Supplying this
