@@ -65,7 +65,11 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
       }
       else if (!all->no_header && _header.empty())
       {
-        for (size_t i = 0; i < elements.size(); i++) { _header.emplace_back(elements[i]); }
+        for (size_t i = 0; i < elements.size(); i++)
+        {
+          check_if_float(elements[i]);
+          _header.emplace_back(elements[i]);
+        }
       }
       else
       {
@@ -98,23 +102,11 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   if (label_index >= csv_line.size() || label_index < 0) { THROW("Label index out of range!"); }
 
   VW::string_view label_content(csv_line[label_index]);
-  if (!has_checked_label_type)
-  {
-    has_checked_label_type = true;
-    try
-    {
-      std::stof(label_content.data());
-    }
-    catch (const std::exception)
-    {
-      is_multiclass_label = true;
-    }
-  }
 
   // Multiclass labels will be auto-converted to 1..k if they are
   // non-numeric e.g. Species: {setosa, versicolor, virginica} -> {1, 2, 3}
   std::string label_string;
-  if (is_multiclass_label)
+  if (!check_if_float(label_content))
   {
     auto it = multiclass_label_counter.find(label_content);
     if (it == multiclass_label_counter.end())
@@ -169,30 +161,25 @@ void parser::parse_features(VW::workspace* all, features& fs, std::vector<VW::st
     if (label_index == i) { continue; }
     // Ignore namespace info value
     float _cur_channel_v = 1.f;
-
+    uint64_t word_hash;
     float _v;
     // Use header line for feature names
     VW::string_view feature_name = _header[i];
     VW::string_view string_feature_value = csv_line[i];
-    bool is_feature_float = true;
+    bool is_feature_float = check_if_float(string_feature_value);
 
     float float_feature_value = 0.f;
-    try
+
+    if (is_feature_float)
     {
       float_feature_value = std::stof(string_feature_value.data());
-    }
-    catch (const std::exception)
-    {
-      is_feature_float = false;
-    }
-
-    if (!is_feature_float) { _v = 1; }
-    else
-    {
       _v = _cur_channel_v * float_feature_value;
     }
+    else
+    {
+      _v = 1;
+    }
 
-    uint64_t word_hash;
     // Case where feature value is string
     if (!is_feature_float)
     {
@@ -237,7 +224,7 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
 
   std::vector<VW::string_view> collections;
   size_t pointer = 0;
-  const char* trim_list = "\r\n\t'\"\xef\xbb\xbf\f\v ";
+  const char* trim_list = "\r\n\t\xef\xbb\xbf\f\v ";
   for (size_t i = 0; i < sv.length(); i++)
   {
     if (sv[i] == ch[0])
@@ -259,6 +246,33 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
   element.remove_suffix(std::min(element.size() - element.find_last_not_of(trim_list) - 1, element.size()));
   collections.emplace_back(element);
   return collections;
+}
+
+bool parser::check_if_float(VW::string_view& sv)
+{
+  const char* trim_list = "'\"";
+  size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
+  size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
+  // Has quotes, so it's not a float
+  if (prefix_pos > 0 && suffix_pos > 0)
+  {
+    // Remove the quotes and continue
+    sv.remove_prefix(prefix_pos);
+    sv.remove_suffix(suffix_pos);
+    return false;
+  }
+  else
+  {
+    try
+    {
+      std::stof(sv.data());
+    }
+    catch (const std::exception)
+    {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace csv
