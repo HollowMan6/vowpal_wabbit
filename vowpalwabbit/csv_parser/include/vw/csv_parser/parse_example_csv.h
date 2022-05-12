@@ -30,7 +30,7 @@ private:
   std::vector<std::string> _header;
   uint64_t _channel_hash;
   int label_index;
-  std::map<VW::string_view, int> multiclass_label_counter;
+  std::map<std::string, int> multiclass_label_counter;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);

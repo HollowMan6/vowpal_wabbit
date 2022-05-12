@@ -152,7 +152,7 @@ public:
 #endif
 
 #ifdef BUILD_CSV
-std::unique_ptr<VW::parsers::csv::parser> csv_converter;
+  std::unique_ptr<VW::parsers::csv::parser> csv_converter;
 #endif
 
   // This field is experimental and subject to change.
@@ -292,10 +292,10 @@ std::unique_ptr<VW::parsers::csv::parser> csv_converter;
                            // when loaded instead.
 
   // CSV parsing configurations
-  std::string separator = ",";
-  bool no_header = false;
-  // int tag = 0;
-  int32_t label = -1;
+  std::string csv_separator = ",";
+  bool csv_no_header = false;
+  // int csv_tag = 0;
+  int32_t csv_label = -1;
 
   // runtime accounting variables.
   float initial_t;
