@@ -54,10 +54,10 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
     else
     {
       std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
-      // If no header present will number features as 1..k based on column number
+      // If no header present, will use empty features
       if (all->csv_no_header && _header.empty())
       {
-        for (size_t i = 1; i < elements.size() + 1; i++) { _header.emplace_back(std::to_string(i)); }
+        for (size_t i = 1; i < elements.size() + 1; i++) { _header.emplace_back(std::string()); }
       }
 
       if (!_header.empty() && elements.size() != _header.size())
