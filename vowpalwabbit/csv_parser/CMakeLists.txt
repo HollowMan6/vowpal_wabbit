@@ -11,7 +11,6 @@ vw_add_library(
     DESCRIPTION "Parser implementation that reads csv examples. Disabled by default. Enable with `BUILD_CSV`"
     EXCEPTION_DESCRIPTION "Yes"
 )
-target_include_directories(vw_csv_parser PUBLIC ${CSV_INCLUDE_DIR})
 
 # vw_add_test_executable(
 #   FOR_LIB "csv_parser"

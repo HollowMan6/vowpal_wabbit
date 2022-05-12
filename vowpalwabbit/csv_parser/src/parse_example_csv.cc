@@ -5,6 +5,7 @@
 #include "vw/csv_parser/parse_example_csv.h"
 
 #include "vw/core/best_constant.h"
+#include "vw/core/parse_primitives.h"
 #include "vw/core/parser.h"
 
 #include <string>
@@ -27,7 +28,7 @@ int parser::parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae)
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
   // Read the data if header exists.
-  if (!all->no_header && first_read) { num_bytes_consumed += read_line(all, ae, buf); }
+  if (!all->csv_no_header && first_read) { num_bytes_consumed += read_line(all, ae, buf); }
   return static_cast<int>(num_bytes_consumed);
 }
 
@@ -49,12 +50,12 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 
     VW::string_view csv_line(line, num_chars);
 
-    if (csv_line.empty()) { ae->is_newline = true; }
+    if (csv_line.empty()) { THROW("Malformed CSV, empty line exists."); }
     else
     {
-      std::vector<VW::string_view> elements = split(csv_line, all->separator);
+      std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
       // If no header present will number features as 1..k based on column number
-      if (all->no_header && _header.empty())
+      if (all->csv_no_header && _header.empty())
       {
         for (size_t i = 1; i < elements.size() + 1; i++) { _header.emplace_back(std::to_string(i)); }
       }
@@ -63,7 +64,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
       {
         THROW("CSV line has " << elements.size() << " elements, but the header has " << _header.size() << " elements.");
       }
-      else if (!all->no_header && _header.empty())
+      else if (!all->csv_no_header && _header.empty())
       {
         for (size_t i = 0; i < elements.size(); i++)
         {
@@ -93,10 +94,10 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 
   // negative numbers support the "from end of line" convention
   // (e.g: -1 is last column, -2 is next-to-last, etc.)
-  if (all->label < 0) { label_index = csv_line.size() + all->label; }
+  if (all->csv_label < 0) { label_index = csv_line.size() + all->csv_label; }
   else
   {
-    label_index = all->label;
+    label_index = all->csv_label;
   }
 
   if (label_index >= csv_line.size() || label_index < 0) { THROW("Label index out of range!"); }
@@ -108,11 +109,12 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   std::string label_string;
   if (!check_if_float(label_content))
   {
-    auto it = multiclass_label_counter.find(label_content);
+    std::string lbl_s = {label_content.begin(), label_content.end()};
+    auto it = multiclass_label_counter.find(lbl_s);
     if (it == multiclass_label_counter.end())
     {
       label_string = std::to_string(multiclass_label_counter.size() + 1);
-      multiclass_label_counter.insert(std::make_pair(label_content, multiclass_label_counter.size() + 1));
+      multiclass_label_counter.insert(std::make_pair(lbl_s, multiclass_label_counter.size() + 1));
     }
     else
     {
@@ -133,23 +135,21 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 
 void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line)
 {
-  // TODO: multiple namespaces support, currently using the filename as namespace
-  std::string ns = all->data_filename;
-  size_t found = ns.find_last_of('.');
-  if (found != std::string::npos) { ns = ns.substr(0, found); }
-
+  // TODO: multiple namespaces support, currently empty namespace
+  std::string ns = " ";
   unsigned char _index = static_cast<unsigned char>(ns[0]);
   bool new_index = false;
 
-  _channel_hash = all->example_parser->hasher(ns.data(), ns.length(), all->hash_seed);
+  // _channel_hash = all->example_parser->hasher(ns.data(), ns.length(), all->hash_seed);
+  _channel_hash = all->hash_seed == 0 ? 0 : VW::uniform_hash("", 0, all->hash_seed);
 
   if (ae->feature_space[_index].size() == 0) { new_index = true; }
 
   ae->feature_space[_index].start_ns_extent(_channel_hash);
   parse_features(all, ae->feature_space[_index], csv_line, (all->audit || all->hash_inv) ? ns.c_str() : nullptr);
-  if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
-
   ae->feature_space[_index].end_ns_extent();
+
+  if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
 }
 
 void parser::parse_features(VW::workspace* all, features& fs, std::vector<VW::string_view> csv_line, const char* ns)
@@ -172,7 +172,8 @@ void parser::parse_features(VW::workspace* all, features& fs, std::vector<VW::st
 
     if (is_feature_float)
     {
-      float_feature_value = std::stof(string_feature_value.data());
+      size_t end_idx = string_feature_value.length();
+      float_feature_value = parseFloat(string_feature_value.data(), end_idx);
       _v = _cur_channel_v * float_feature_value;
     }
     else
@@ -224,6 +225,7 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
 
   std::vector<VW::string_view> collections;
   size_t pointer = 0;
+  // Trim extra characters that are useless for us to read
   const char* trim_list = "\r\n\t\xef\xbb\xbf\f\v ";
   for (size_t i = 0; i < sv.length(); i++)
   {
@@ -263,16 +265,12 @@ bool parser::check_if_float(VW::string_view& sv)
   }
   else
   {
-    try
-    {
-      std::stof(sv.data());
-    }
-    catch (const std::exception)
-    {
-      return false;
-    }
+    std::string s = {sv.begin(), sv.end()};
+    if (s.empty()) { return false; }
+    char* ptr;
+    std::strtof(s.c_str(), &ptr);
+    return (*ptr) == '\0';
   }
-  return true;
 }
 
 }  // namespace csv
