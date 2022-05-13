@@ -17,7 +17,7 @@ namespace parsers
 {
 namespace csv
 {
-int csv_to_examples(VW::workspace* all, io_buf& buf, VW::v_array<example*>& examples);
+int csv_to_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 
 class parser
 {
@@ -27,16 +27,19 @@ public:
   int parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae);
 
 private:
-  std::vector<std::string> _header;
+  std::vector<std::string> _header_fn;
+  std::vector<std::string> _header_ns;
   uint64_t _channel_hash;
   int label_index;
+  size_t _anon;
   std::map<std::string, int> multiclass_label_counter;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line);
-  void parse_features(VW::workspace* all, features& fs, std::vector<VW::string_view> csv_line, const char* ns);
+  void parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
+      VW::string_view string_feature_value, const char* ns);
   std::vector<VW::string_view> split(VW::string_view sv, std::string ch);
   bool check_if_float(VW::string_view& sv);
 };

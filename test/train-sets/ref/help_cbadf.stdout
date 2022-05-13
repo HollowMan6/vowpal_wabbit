@@ -123,6 +123,10 @@ Input Options:
     --csv                                   Data file will be interpreted as a csv file (type: bool, experimental)
     --csv_separator arg                     CSV Parser: Explicitly specify field separator in one character
                                             Default: ',' (comma) (type: str, experimental)
+    --csv_ns_separator arg                  CSV Parser: Explicitly specify separator for namespace and feature
+                                            name of the header in one character. We will only separate from
+                                            the first ns_separator, if no separator exists, then the namespace
+                                            would be empty. Default: '.' (type: str, experimental)
     --csv_no_header                         CSV Parser: First line is NOT a header. By default, csv files
                                             are assumed to have a header with feature names (type: bool,
                                             experimental)
