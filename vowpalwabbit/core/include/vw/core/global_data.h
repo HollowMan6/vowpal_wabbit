@@ -317,6 +317,7 @@ public:
 
   // CSV parsing configurations
   std::string csv_separator = ",";
+  std::string csv_ns_separator = ".";
   bool csv_no_header = false;
   // int csv_tag = 0;
   int32_t csv_label = -1;

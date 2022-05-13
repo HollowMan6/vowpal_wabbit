@@ -16,7 +16,7 @@ namespace parsers
 {
 namespace csv
 {
-int csv_to_examples(VW::workspace* all, io_buf& buf, v_array<example*>& examples)
+int csv_to_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
 {
   return all->csv_converter->parse_csv(all, buf, examples[0]);
 }
@@ -24,7 +24,7 @@ int csv_to_examples(VW::workspace* all, io_buf& buf, v_array<example*>& examples
 int parser::parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae)
 {
   bool first_read = false;
-  if (_header.empty()) { first_read = true; }
+  if (_header_fn.empty()) { first_read = true; }
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
   // Read the data if header exists.
@@ -55,21 +55,44 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
     {
       std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
       // If no header present, will use empty features
-      if (all->csv_no_header && _header.empty())
+      if (all->csv_no_header && _header_fn.empty())
       {
-        for (size_t i = 1; i < elements.size() + 1; i++) { _header.emplace_back(std::string()); }
+        for (size_t i = 1; i < elements.size() + 1; i++)
+        {
+          _header_fn.emplace_back(std::string());
+          _header_ns.emplace_back(std::string());
+        }
       }
 
-      if (!_header.empty() && elements.size() != _header.size())
+      if (!_header_fn.empty() && elements.size() != _header_fn.size())
       {
-        THROW("CSV line has " << elements.size() << " elements, but the header has " << _header.size() << " elements.");
+        THROW("CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size()
+                              << " elements.");
       }
-      else if (!all->csv_no_header && _header.empty())
+      else if (!all->csv_no_header && _header_fn.empty())
       {
         for (size_t i = 0; i < elements.size(); i++)
         {
+          // Just use it to remove the quotes.
           check_if_float(elements[i]);
-          _header.emplace_back(elements[i]);
+
+          // Seperate the feature name and namespace from the header.
+          if (all->csv_ns_separator.length() != 1)
+          { THROW("You can only specify a single character to be the separator!"); }
+          size_t found = elements[i].find_first_of(all->csv_ns_separator);
+          VW::string_view feature_name;
+          VW::string_view ns;
+          if (found != std::string::npos)
+          {
+            ns = elements[i].substr(0, found);
+            feature_name = elements[i].substr(found + 1);
+          }
+          else
+          {
+            feature_name = elements[i];
+          }
+          _header_fn.emplace_back(feature_name);
+          _header_ns.emplace_back(ns);
         }
       }
       else
@@ -135,86 +158,90 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 
 void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line)
 {
-  // TODO: multiple namespaces support, currently empty namespace
-  std::string ns = " ";
-  unsigned char _index = static_cast<unsigned char>(ns[0]);
-  bool new_index = false;
-
-  // _channel_hash = all->example_parser->hasher(ns.data(), ns.length(), all->hash_seed);
-  _channel_hash = all->hash_seed == 0 ? 0 : VW::uniform_hash("", 0, all->hash_seed);
-
-  if (ae->feature_space[_index].size() == 0) { new_index = true; }
-
-  ae->feature_space[_index].start_ns_extent(_channel_hash);
-  parse_features(all, ae->feature_space[_index], csv_line, (all->audit || all->hash_inv) ? ns.c_str() : nullptr);
-  ae->feature_space[_index].end_ns_extent();
-
-  if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
-}
-
-void parser::parse_features(VW::workspace* all, features& fs, std::vector<VW::string_view> csv_line, const char* ns)
-{
-  size_t _anon = 0;
-  for (size_t i = 0; i < csv_line.size(); i++)
+  _anon = 0;
+  for (size_t i = 0; i < _header_ns.size(); i++)
   {
     // Skip label
     if (label_index == i) { continue; }
-    // Ignore namespace info value
-    float _cur_channel_v = 1.f;
-    uint64_t word_hash;
-    float _v;
-    // Use header line for feature names
-    VW::string_view feature_name = _header[i];
-    VW::string_view string_feature_value = csv_line[i];
-    bool is_feature_float = check_if_float(string_feature_value);
 
-    float float_feature_value = 0.f;
-
-    if (is_feature_float)
+    std::string ns;
+    bool new_index = false;
+    if (_header_ns[i].empty())
     {
-      size_t end_idx = string_feature_value.length();
-      float_feature_value = parseFloat(string_feature_value.data(), end_idx);
-      _v = _cur_channel_v * float_feature_value;
+      ns = " ";
+      _channel_hash = all->hash_seed == 0 ? 0 : VW::uniform_hash("", 0, all->hash_seed);
     }
     else
     {
-      _v = 1;
+      ns = {_header_ns[i].begin(), _header_ns[i].end()};
+      _channel_hash = all->example_parser->hasher(ns.data(), ns.length(), all->hash_seed);
     }
 
-    // Case where feature value is string
+    unsigned char _index = static_cast<unsigned char>(ns[0]);
+    if (ae->feature_space[_index].size() == 0) { new_index = true; }
+
+    ae->feature_space[_index].start_ns_extent(_channel_hash);
+    parse_features(all, ae->feature_space[_index], _header_fn[i], csv_line[i],
+        (all->audit || all->hash_inv) ? ns.c_str() : nullptr);
+    ae->feature_space[_index].end_ns_extent();
+
+    if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
+  }
+}
+
+void parser::parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
+    VW::string_view string_feature_value, const char* ns)
+{
+  // Ignore namespace info value
+  float _cur_channel_v = 1.f;
+  uint64_t word_hash;
+  float _v;
+  bool is_feature_float = check_if_float(string_feature_value);
+
+  float float_feature_value = 0.f;
+
+  if (is_feature_float)
+  {
+    size_t end_idx = string_feature_value.length();
+    float_feature_value = parseFloat(string_feature_value.data(), end_idx);
+    _v = _cur_channel_v * float_feature_value;
+  }
+  else
+  {
+    _v = 1;
+  }
+
+  // Case where feature value is string
+  if (!is_feature_float)
+  {
+    // chain hash is hash(feature_value, hash(feature_name, namespace_hash)) & parse_mask
+    word_hash = (all->example_parser->hasher(string_feature_value.data(), string_feature_value.length(),
+                     all->example_parser->hasher(feature_name.data(), feature_name.length(), _channel_hash)) &
+        all->parse_mask);
+  }
+  // Case where feature value is float and feature name is not empty
+  else if (!feature_name.empty())
+  {
+    word_hash =
+        (all->example_parser->hasher(feature_name.data(), feature_name.length(), _channel_hash) & all->parse_mask);
+  }
+  // Case where feature value is float and feature name is empty
+  else
+  {
+    word_hash = _channel_hash + _anon++;
+  }
+
+  // don't add 0 valued features to list of features
+  if (_v == 0) { return; }
+  fs.push_back(_v, word_hash);
+
+  if ((all->audit || all->hash_inv) && ns != nullptr)
+  {
     if (!is_feature_float)
-    {
-      // chain hash is hash(feature_value, hash(feature_name, namespace_hash)) & parse_mask
-      word_hash = (all->example_parser->hasher(string_feature_value.data(), string_feature_value.length(),
-                       all->example_parser->hasher(feature_name.data(), feature_name.length(), _channel_hash)) &
-          all->parse_mask);
-    }
-    // Case where feature value is float and feature name is not empty
-    else if (!feature_name.empty())
-    {
-      word_hash =
-          (all->example_parser->hasher(feature_name.data(), feature_name.length(), _channel_hash) & all->parse_mask);
-    }
-    // Case where feature value is float and feature name is empty
+    { fs.space_names.push_back(VW::audit_strings(ns, std::string{feature_name}, std::string{string_feature_value})); }
     else
     {
-      word_hash = _channel_hash + _anon++;
-    }
-
-    // don't add 0 valued features to list of features
-    if (_v == 0) { continue; }
-    fs.push_back(_v, word_hash);
-
-    if ((all->audit || all->hash_inv) && ns != nullptr)
-    {
-      if (!is_feature_float)
-      {
-        fs.space_names.push_back(VW::audit_strings(ns, std::string{feature_name}, std::string{string_feature_value}));
-      }
-      else
-      {
-        fs.space_names.push_back(VW::audit_strings(ns, std::string{feature_name}));
-      }
+      fs.space_names.push_back(VW::audit_strings(ns, std::string{feature_name}));
     }
   }
 }

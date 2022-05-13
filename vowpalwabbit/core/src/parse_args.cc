@@ -414,6 +414,12 @@ input_options parse_source(VW::workspace& all, options_i& options)
                .help("CSV Parser: Explicitly specify field separator in one character "
                      "Default: ',' (comma)")
                .experimental())
+      .add(make_option("csv_ns_separator", all.csv_ns_separator)
+               .help("CSV Parser: Explicitly specify separator for namespace and feature name of the header in "
+                     "one character. We will only separate from the first ns_separator, if no separator exists, "
+                     "then the namespace would be empty. "
+                     "Default: '.'")
+               .experimental())
       .add(make_option("csv_no_header", all.csv_no_header)
                .help("CSV Parser: First line is NOT a header. By default, csv files "
                      "are assumed to have a header with feature names")
