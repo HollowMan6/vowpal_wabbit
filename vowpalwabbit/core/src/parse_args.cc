@@ -432,6 +432,11 @@ input_options parse_source(VW::workspace& all, options_i& options)
                .help("CSV Parser: Use the specified integer index as the label column-number "
                      "The label (aka response) is always dropped from the "
                      "input features. Default: -1 (last column)")
+               .experimental())
+      .add(make_option("csv_ns_value", all.csv_ns_value)
+               .keep()
+               .help("CSV Parser: Scale the namespace values by specifying the float "
+                     "ratio. e.g. --csv_ns_value=a:0.5,b:0.3,:8 ")
                .experimental());
 #ifdef BUILD_EXTERNAL_PARSER
   VW::external::parser::set_parse_args(input_options, parsed_options);

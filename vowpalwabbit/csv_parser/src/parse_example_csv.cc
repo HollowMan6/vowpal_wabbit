@@ -54,10 +54,30 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
     else
     {
       std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
+
+      // Store the ns value from CmdLine
+      if (_header_ns.empty() && !all->csv_ns_value.empty())
+      {
+        std::vector<VW::string_view> ns_values = split(all->csv_ns_value, ",");
+        for (size_t i = 0; i < ns_values.size(); i++)
+        {
+          std::vector<VW::string_view> pair = split(ns_values[i], ":");
+          std::string ns = " ";
+          if (pair.size() != 2 || pair[1].empty() || !check_if_float(pair[1]))
+          { THROW("Malformed namespace value pair: " << ns_values[i]); }
+          else if (!pair[0].empty())
+          {
+            ns = {pair[0].begin(), pair[0].end()};
+          }
+          size_t end_idx = pair[1].length();
+          ns_value.insert(std::make_pair(ns, parseFloat(pair[1].data(), end_idx)));
+        }
+      }
+
       // If no header present, will use empty features
       if (all->csv_no_header && _header_fn.empty())
       {
-        for (size_t i = 1; i < elements.size() + 1; i++)
+        for (size_t i = 0; i < elements.size(); i++)
         {
           _header_fn.emplace_back(std::string());
           _header_ns.emplace_back(std::string());
@@ -181,8 +201,7 @@ void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::s
     if (ae->feature_space[_index].size() == 0) { new_index = true; }
 
     ae->feature_space[_index].start_ns_extent(_channel_hash);
-    parse_features(all, ae->feature_space[_index], _header_fn[i], csv_line[i],
-        (all->audit || all->hash_inv) ? ns.c_str() : nullptr);
+    parse_features(all, ae->feature_space[_index], _header_fn[i], csv_line[i], ns.c_str());
     ae->feature_space[_index].end_ns_extent();
 
     if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
@@ -192,8 +211,10 @@ void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::s
 void parser::parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
     VW::string_view string_feature_value, const char* ns)
 {
-  // Ignore namespace info value
   float _cur_channel_v = 1.f;
+  auto it = ns_value.find(ns);
+  if (it != ns_value.end()) { _cur_channel_v = it->second; }
+
   uint64_t word_hash;
   float _v;
   bool is_feature_float = check_if_float(string_feature_value);

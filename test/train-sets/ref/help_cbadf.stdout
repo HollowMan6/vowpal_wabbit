@@ -133,6 +133,8 @@ Input Options:
     --csv_label arg                         CSV Parser: Use the specified integer index as the label column-number
                                             The label (aka response) is always dropped from the input features.
                                             Default: -1 (last column) (type: int, experimental)
+    --csv_ns_value arg                      CSV Parser: Scale the namespace values by specifying the float
+                                            ratio. e.g. --csv_ns_value=a:0.5,b:0.3,:8 (type: str, keep, experimental)
 Logging Options:
     --quiet                                 Don't output diagnostics and progress updates. Supplying this
                                             implies --log_level off and --driver_output_off. Supplying this

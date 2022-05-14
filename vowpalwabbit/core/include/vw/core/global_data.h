@@ -321,6 +321,7 @@ public:
   bool csv_no_header = false;
   // int csv_tag = 0;
   int32_t csv_label = -1;
+  std::string csv_ns_value = "";
 
   // runtime accounting variables.
   float initial_t;
