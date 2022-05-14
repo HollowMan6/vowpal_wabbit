@@ -93,8 +93,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
       {
         for (size_t i = 0; i < elements.size(); i++)
         {
-          // Just use it to remove the quotes.
-          check_if_float(elements[i]);
+          remove_quotation_marks(elements[i]);
 
           // Seperate the feature name and namespace from the header.
           if (all->csv_ns_separator.length() != 1)
@@ -102,7 +101,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
           size_t found = elements[i].find_first_of(all->csv_ns_separator);
           VW::string_view feature_name;
           VW::string_view ns;
-          if (found != std::string::npos)
+          if (found != VW::string_view::npos)
           {
             ns = elements[i].substr(0, found);
             feature_name = elements[i].substr(found + 1);
@@ -150,8 +149,11 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   // Multiclass labels will be auto-converted to 1..k if they are
   // non-numeric e.g. Species: {setosa, versicolor, virginica} -> {1, 2, 3}
   std::string label_string;
-  if (!check_if_float(label_content))
+  std::string special_label_contained_str = " :,";
+  if (!check_if_float(label_content) &&
+      label_content.find_first_of(special_label_contained_str) == VW::string_view::npos)
   {
+    remove_quotation_marks(label_content);
     std::string lbl_s = {label_content.begin(), label_content.end()};
     auto it = multiclass_label_counter.find(lbl_s);
     if (it == multiclass_label_counter.end())
@@ -164,6 +166,10 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
       label_string = std::to_string(it->second);
     }
     label_content = VW::string_view(label_string);
+  }
+  else
+  {
+    remove_quotation_marks(label_content);
   }
 
   all->example_parser->words.clear();
@@ -218,6 +224,7 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
   uint64_t word_hash;
   float _v;
   bool is_feature_float = check_if_float(string_feature_value);
+  if (!is_feature_float) { remove_quotation_marks(string_feature_value); }
 
   float float_feature_value = 0.f;
 
@@ -277,6 +284,7 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
   const char* trim_list = "\r\n\t\xef\xbb\xbf\f\v ";
   for (size_t i = 0; i < sv.length(); i++)
   {
+    // You can't escape the csv separator by including it inside the quotation marks
     if (sv[i] == ch[0])
     {
       VW::string_view element(&sv[pointer], i - pointer);
@@ -298,27 +306,34 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
   return collections;
 }
 
-bool parser::check_if_float(VW::string_view& sv)
+void parser::remove_quotation_marks(VW::string_view& sv)
 {
   const char* trim_list = "'\"";
   size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
   size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
-  // Has quotes, so it's not a float
-  if (prefix_pos > 0 && suffix_pos > 0)
+  if (prefix_pos > 0 || suffix_pos > 0)
   {
-    // Remove the quotes and continue
+    // Check whether the quotation marks pair
+    if (prefix_pos != suffix_pos) { THROW("Malformed string, unpaired quotes: " << sv); }
+    else
+    {
+      for (size_t i = 0; i < prefix_pos; i++)
+      {
+        if (sv[i] != sv[sv.size() - i - 1]) { THROW("Malformed string, unpaired quotes: " << sv); }
+      }
+    }
     sv.remove_prefix(prefix_pos);
     sv.remove_suffix(suffix_pos);
-    return false;
   }
-  else
-  {
-    std::string s = {sv.begin(), sv.end()};
-    if (s.empty()) { return false; }
-    char* ptr;
-    std::strtof(s.c_str(), &ptr);
-    return (*ptr) == '\0';
-  }
+}
+
+bool parser::check_if_float(VW::string_view& sv)
+{
+  std::string s = {sv.begin(), sv.end()};
+  if (s.empty()) { return false; }
+  char* ptr;
+  std::strtof(s.c_str(), &ptr);
+  return (*ptr) == '\0';
 }
 
 }  // namespace csv
