@@ -42,6 +42,7 @@ private:
   void parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
       VW::string_view string_feature_value, const char* ns);
   std::vector<VW::string_view> split(VW::string_view sv, std::string ch);
+  void remove_quotation_marks(VW::string_view& sv);
   bool check_if_float(VW::string_view& sv);
 };
 }  // namespace csv
