@@ -56,7 +56,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 
 void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line)
 {
-  if (csv_line.empty()) { THROW("Malformed CSV, empty line exists."); }
+  if (csv_line.empty()) { THROW("Malformed CSV, empty line exists!"); }
   else
   {
     std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
@@ -93,7 +93,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
     if (!_header_fn.empty() && elements.size() != _header_fn.size())
     {
       THROW(
-          "CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size() << " elements.");
+          "CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size() << " elements!");
     }
     else if (!all->csv_no_header && _header_fn.empty())
     {
@@ -102,8 +102,6 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
         remove_quotation_marks(elements[i]);
 
         // Seperate the feature name and namespace from the header.
-        if (all->csv_ns_separator.length() != 1)
-        { THROW("You can only specify a single character to be the separator!"); }
         size_t found = elements[i].find_first_of(all->csv_ns_separator);
         VW::string_view feature_name;
         VW::string_view ns;
@@ -146,7 +144,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
     label_index = all->csv_label;
   }
 
-  if (label_index >= csv_line.size() || label_index < 0) { THROW("Label index out of range!"); }
+  if (label_index >= csv_line.size() || label_index < 0) { THROW("Label index out of range: " << label_index); }
 
   VW::string_view label_content(csv_line[label_index]);
 
@@ -280,8 +278,6 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
 
 std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
 {
-  if (ch.length() != 1) { THROW("You can only specify a single character to be the separator!"); }
-
   std::vector<VW::string_view> collections;
   size_t pointer = 0;
   // Trim extra characters that are useless for us to read

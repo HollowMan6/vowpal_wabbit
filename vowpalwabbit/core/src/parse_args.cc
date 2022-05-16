@@ -483,6 +483,35 @@ input_options parse_source(VW::workspace& all, options_i& options)
     *(all.trace_message) << "Making holdout_set_off=true since output regularizer specified" << endl;
   }
 
+  if (parsed_options.csv)
+  {
+    if (all.csv_ns_separator.length() > 1)
+    {
+      all.csv_ns_separator = all.csv_ns_separator.substr(0, 1);
+      all.logger.err_warn(
+          "Multiple characters passed as CSV namespace separator, only the first one will be "
+          "read and the rest will be ignored.");
+    }
+    else if (all.csv_ns_separator.empty())
+    {
+      all.csv_ns_separator = ".";
+      all.logger.err_warn("No characters passed as CSV namespace separator, return to default '.'");
+    }
+
+    if (all.csv_separator.length() > 1)
+    {
+      all.csv_separator = all.csv_separator.substr(0, 1);
+      all.logger.err_warn(
+          "Multiple characters passed as CSV separator, only the first one will be "
+          "read and the rest will be ignored.");
+    }
+    else if (all.csv_separator.empty())
+    {
+      all.csv_separator = ",";
+      all.logger.err_warn("No characters passed as CSV separator, return to default ','");
+    }
+  }
+
   return parsed_options;
 }
 
