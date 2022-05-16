@@ -49,78 +49,82 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
     if (num_chars > 0 && line[num_chars - 1] == '\r') { num_chars--; }
 
     VW::string_view csv_line(line, num_chars);
-
-    if (csv_line.empty()) { THROW("Malformed CSV, empty line exists."); }
-    else
-    {
-      std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
-
-      // Store the ns value from CmdLine
-      if (_header_ns.empty() && !all->csv_ns_value.empty())
-      {
-        std::vector<VW::string_view> ns_values = split(all->csv_ns_value, ",");
-        for (size_t i = 0; i < ns_values.size(); i++)
-        {
-          std::vector<VW::string_view> pair = split(ns_values[i], ":");
-          std::string ns = " ";
-          if (pair.size() != 2 || pair[1].empty() || !check_if_float(pair[1]))
-          { THROW("Malformed namespace value pair: " << ns_values[i]); }
-          else if (!pair[0].empty())
-          {
-            ns = {pair[0].begin(), pair[0].end()};
-          }
-          size_t end_idx = pair[1].length();
-          ns_value.insert(std::make_pair(ns, parseFloat(pair[1].data(), end_idx)));
-        }
-      }
-
-      // If no header present, will use empty features
-      if (all->csv_no_header && _header_fn.empty())
-      {
-        for (size_t i = 0; i < elements.size(); i++)
-        {
-          _header_fn.emplace_back(std::string());
-          _header_ns.emplace_back(std::string());
-        }
-      }
-
-      if (!_header_fn.empty() && elements.size() != _header_fn.size())
-      {
-        THROW("CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size()
-                              << " elements.");
-      }
-      else if (!all->csv_no_header && _header_fn.empty())
-      {
-        for (size_t i = 0; i < elements.size(); i++)
-        {
-          remove_quotation_marks(elements[i]);
-
-          // Seperate the feature name and namespace from the header.
-          if (all->csv_ns_separator.length() != 1)
-          { THROW("You can only specify a single character to be the separator!"); }
-          size_t found = elements[i].find_first_of(all->csv_ns_separator);
-          VW::string_view feature_name;
-          VW::string_view ns;
-          if (found != VW::string_view::npos)
-          {
-            ns = elements[i].substr(0, found);
-            feature_name = elements[i].substr(found + 1);
-          }
-          else
-          {
-            feature_name = elements[i];
-          }
-          _header_fn.emplace_back(feature_name);
-          _header_ns.emplace_back(ns);
-        }
-      }
-      else
-      {
-        parse_example(all, ae, elements);
-      }
-    }
+    parse_line(all, ae, csv_line);
   }
   return num_chars_initial;
+}
+
+void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line)
+{
+  if (csv_line.empty()) { THROW("Malformed CSV, empty line exists."); }
+  else
+  {
+    std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
+
+    // Store the ns value from CmdLine
+    if (_header_ns.empty() && !all->csv_ns_value.empty())
+    {
+      std::vector<VW::string_view> ns_values = split(all->csv_ns_value, ",");
+      for (size_t i = 0; i < ns_values.size(); i++)
+      {
+        std::vector<VW::string_view> pair = split(ns_values[i], ":");
+        std::string ns = " ";
+        if (pair.size() != 2 || pair[1].empty() || !check_if_float(pair[1]))
+        { THROW("Malformed namespace value pair: " << ns_values[i]); }
+        else if (!pair[0].empty())
+        {
+          ns = {pair[0].begin(), pair[0].end()};
+        }
+        size_t end_idx = pair[1].length();
+        ns_value.insert(std::make_pair(ns, parseFloat(pair[1].data(), end_idx)));
+      }
+    }
+
+    // If no header present, will use empty features
+    if (all->csv_no_header && _header_fn.empty())
+    {
+      for (size_t i = 0; i < elements.size(); i++)
+      {
+        _header_fn.emplace_back(std::string());
+        _header_ns.emplace_back(std::string());
+      }
+    }
+
+    if (!_header_fn.empty() && elements.size() != _header_fn.size())
+    {
+      THROW(
+          "CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size() << " elements.");
+    }
+    else if (!all->csv_no_header && _header_fn.empty())
+    {
+      for (size_t i = 0; i < elements.size(); i++)
+      {
+        remove_quotation_marks(elements[i]);
+
+        // Seperate the feature name and namespace from the header.
+        if (all->csv_ns_separator.length() != 1)
+        { THROW("You can only specify a single character to be the separator!"); }
+        size_t found = elements[i].find_first_of(all->csv_ns_separator);
+        VW::string_view feature_name;
+        VW::string_view ns;
+        if (found != VW::string_view::npos)
+        {
+          ns = elements[i].substr(0, found);
+          feature_name = elements[i].substr(found + 1);
+        }
+        else
+        {
+          feature_name = elements[i];
+        }
+        _header_fn.emplace_back(feature_name);
+        _header_ns.emplace_back(ns);
+      }
+    }
+    else
+    {
+      parse_example(all, ae, elements);
+    }
+  }
 }
 
 void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)

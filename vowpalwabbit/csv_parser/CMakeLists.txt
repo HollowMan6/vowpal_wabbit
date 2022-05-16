@@ -12,8 +12,8 @@ vw_add_library(
     EXCEPTION_DESCRIPTION "Yes"
 )
 
-# vw_add_test_executable(
-#   FOR_LIB "csv_parser"
-#   SOURCES "tests/csv_parser_test.cc"
-#   EXTRA_DEPS vw_core
-# )
+vw_add_test_executable(
+  FOR_LIB "csv_parser"
+  SOURCES "tests/csv_parser_test.cc"
+  EXTRA_DEPS vw_core
+)

@@ -25,6 +25,7 @@ public:
   parser() = default;
 
   int parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae);
+  void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
 
 private:
   std::vector<std::string> _header_fn;
