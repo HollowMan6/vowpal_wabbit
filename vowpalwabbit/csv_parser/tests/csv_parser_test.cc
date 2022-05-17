@@ -12,12 +12,12 @@
 TEST(csv_parser_tests, test_csv_standalone_example)
 {
   auto all = VW::initialize(
-      "--no_stdin --quiet --csv --csv_separator ; --csv_ns_separator | --csv_label -4 --csv_ns_value :5,sepal1:1.1",
+      "--no_stdin --quiet --csv --csv_separator ; --csv_ns_separator . --csv_label -4 --csv_ns_value :5,sepal1:1.1",
       nullptr, false, nullptr, nullptr);
   auto ae = &VW::get_unused_example(all);
 
   all->csv_converter->parse_line(
-      all, ae, "\"sepal1|length\";\"sepal|width\";\"petal|length\";'petal|width';\"variety\";\ttype;a;k");
+      all, ae, "\"sepal1.length\";\"sepal.width\";\"petal.length\"\";'petal.width';\"variety\";\ttype;a;k");
   all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;\"Setosa\";1;'test';0");
   VW::setup_example(*all, ae);
 

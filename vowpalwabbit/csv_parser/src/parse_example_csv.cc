@@ -313,17 +313,13 @@ void parser::remove_quotation_marks(VW::string_view& sv)
   size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
   if (prefix_pos > 0 || suffix_pos > 0)
   {
-    // Check whether the quotation marks pair
-    if (prefix_pos != suffix_pos) { THROW("Malformed string, unpaired quotes: " << sv); }
-    else
-    {
-      for (size_t i = 0; i < prefix_pos; i++)
-      {
-        if (sv[i] != sv[sv.size() - i - 1]) { THROW("Malformed string, unpaired quotes: " << sv); }
-      }
-    }
-    sv.remove_prefix(prefix_pos);
-    sv.remove_suffix(suffix_pos);
+    // e.g.: Correct: "abc'", "abc"", "ab"c", "ab'c", "'abc"
+    // Incorrect: "abc', 'abc", ab"c", "ab'c, 'abc
+    if (sv[0] != sv[sv.size() - 1]) { THROW("Malformed string, unpaired quotes: " << sv); }
+
+    size_t trim_pos = std::min(prefix_pos, suffix_pos);
+    sv.remove_prefix(trim_pos);
+    sv.remove_suffix(trim_pos);
   }
 }
 
