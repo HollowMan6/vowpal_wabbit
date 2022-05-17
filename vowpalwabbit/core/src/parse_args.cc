@@ -485,31 +485,8 @@ input_options parse_source(VW::workspace& all, options_i& options)
 
   if (parsed_options.csv)
   {
-    if (all.csv_ns_separator.length() > 1)
-    {
-      all.csv_ns_separator = all.csv_ns_separator.substr(0, 1);
-      all.logger.err_warn(
-          "Multiple characters passed as CSV namespace separator, only the first one will be "
-          "read and the rest will be ignored.");
-    }
-    else if (all.csv_ns_separator.empty())
-    {
-      all.csv_ns_separator = ".";
-      all.logger.err_warn("No characters passed as CSV namespace separator, return to default '.'");
-    }
-
-    if (all.csv_separator.length() > 1)
-    {
-      all.csv_separator = all.csv_separator.substr(0, 1);
-      all.logger.err_warn(
-          "Multiple characters passed as CSV separator, only the first one will be "
-          "read and the rest will be ignored.");
-    }
-    else if (all.csv_separator.empty())
-    {
-      all.csv_separator = ",";
-      all.logger.err_warn("No characters passed as CSV separator, return to default ','");
-    }
+    handling_separator(all, all.csv_ns_separator, "CSV Namespace Separator", '|');
+    handling_separator(all, all.csv_separator, "CSV separator", ',');
   }
 
   return parsed_options;
@@ -602,6 +579,40 @@ std::tuple<std::string, std::string> extract_ignored_feature(VW::string_view nam
 }
 }  // namespace details
 }  // namespace VW
+
+void handling_separator(VW::workspace& all, std::string& str, const std::string& name, const char default_symbol)
+{
+  if (str.length() > 1)
+  {
+    char result = str[0];
+    if (str[0] == '\\')
+    {
+      switch (str[1])
+      {
+        // Allow to specify \t as tabs
+        case 't':
+          result = '\t';
+          break;
+        default:
+          break;
+      }
+    }
+
+    if ((result != str[0] && str.length() > 2) || result == str[0])
+    {
+      all.logger.err_warn(
+          "Multiple characters passed as {}, only the first one will be "
+          "read and the rest will be ignored.",
+          name);
+    }
+    str = result;
+  }
+  else if (str.empty())
+  {
+    str = default_symbol;
+    all.logger.err_warn("No characters passed as {}, return to default '{}'", name, default_symbol);
+  }
+}
 
 std::vector<VW::namespace_index> parse_char_interactions(VW::string_view input, VW::io::logger& logger)
 {
