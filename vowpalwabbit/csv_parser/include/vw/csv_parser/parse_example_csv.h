@@ -34,7 +34,6 @@ private:
   int label_index;
   size_t _anon;
   std::map<std::string, float> ns_value;
-  std::map<std::string, int> multiclass_label_counter;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);

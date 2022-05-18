@@ -148,31 +148,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 
   VW::string_view label_content(csv_line[label_index]);
 
-  // Multiclass labels will be auto-converted to 1..k if they are
-  // non-numeric e.g. Species: {setosa, versicolor, virginica} -> {1, 2, 3}
-  std::string label_string;
-  std::string special_label_contained_str = " :,";
-  if (!check_if_float(label_content) &&
-      label_content.find_first_of(special_label_contained_str) == VW::string_view::npos)
-  {
-    remove_quotation_marks(label_content);
-    std::string lbl_s = {label_content.begin(), label_content.end()};
-    auto it = multiclass_label_counter.find(lbl_s);
-    if (it == multiclass_label_counter.end())
-    {
-      label_string = std::to_string(multiclass_label_counter.size() + 1);
-      multiclass_label_counter.insert(std::make_pair(lbl_s, multiclass_label_counter.size() + 1));
-    }
-    else
-    {
-      label_string = std::to_string(it->second);
-    }
-    label_content = VW::string_view(label_string);
-  }
-  else
-  {
-    remove_quotation_marks(label_content);
-  }
+  remove_quotation_marks(label_content);
 
   all->example_parser->words.clear();
   VW::tokenize(' ', label_content, all->example_parser->words);
@@ -311,15 +287,13 @@ void parser::remove_quotation_marks(VW::string_view& sv)
   const char* trim_list = "'\"";
   size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
   size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
-  if (prefix_pos > 0 || suffix_pos > 0)
-  {
-    // e.g.: Correct: "abc'", "abc"", "ab"c", "ab'c", "'abc"
-    // Incorrect: "abc', 'abc", ab"c", "ab'c, 'abc
-    if (sv[0] != sv[sv.size() - 1]) { THROW("Malformed string, unpaired quotes: " << sv); }
 
-    size_t trim_pos = std::min(prefix_pos, suffix_pos);
-    sv.remove_prefix(trim_pos);
-    sv.remove_suffix(trim_pos);
+  // When the outer quotes pair, we just remove them.
+  // If they don't, we just keep them without throwing any errors.
+  if (sv.size() > 1 && prefix_pos > 0 && suffix_pos > 0 && sv[0] == sv[sv.size() - 1])
+  {
+    sv.remove_prefix(1);
+    sv.remove_suffix(1);
   }
 }
 
