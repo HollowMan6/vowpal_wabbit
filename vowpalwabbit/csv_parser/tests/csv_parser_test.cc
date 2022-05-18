@@ -18,7 +18,7 @@ TEST(csv_parser_tests, test_csv_standalone_example)
 
   all->csv_converter->parse_line(
       all, ae, "\"sepal1.length\";\"sepal.width\";\"petal.length\"\";'petal.width';\"variety\";\ttype;a;k");
-  all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;\"Setosa\";1;'test';0");
+  all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;\"1 2\";1;'test';0");
   VW::setup_example(*all, ae);
 
   // Check feature numbers
