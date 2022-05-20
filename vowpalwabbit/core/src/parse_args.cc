@@ -488,11 +488,7 @@ input_options parse_source(VW::workspace& all, options_i& options)
     handling_separator(all, all.csv_ns_separator, "CSV namespace separator", '|');
     handling_separator(all, all.csv_separator, "CSV separator", ',');
     if (all.csv_ns_separator[0] == all.csv_separator[0])
-    {
-      all.logger.err_warn(
-          "CSV namespace and field separator are the same character, "
-          "namespace separator will be ignored.");
-    }
+    { THROW("CSV namespace and field separator are the same character!"); }
   }
 
   return parsed_options;
@@ -596,6 +592,7 @@ void handling_separator(VW::workspace& all, std::string& str, const std::string&
       switch (str[1])
       {
         // Allow to specify \t as tabs
+        // As pressing tabs usually means auto completion
         case 't':
           result = '\t';
           break;

@@ -99,7 +99,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
     {
       for (size_t i = 0; i < elements.size(); i++)
       {
-        remove_quotation_marks(elements[i]);
+        // remove_quotation_marks(elements[i]);
 
         // Seperate the feature name and namespace from the header.
         size_t found = elements[i].find_first_of(all->csv_ns_separator);
@@ -148,7 +148,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 
   VW::string_view label_content(csv_line[label_index]);
 
-  remove_quotation_marks(label_content);
+  // remove_quotation_marks(label_content);
 
   all->example_parser->words.clear();
   VW::tokenize(' ', label_content, all->example_parser->words);
@@ -202,7 +202,7 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
   uint64_t word_hash;
   float _v;
   bool is_feature_float = check_if_float(string_feature_value);
-  if (!is_feature_float) { remove_quotation_marks(string_feature_value); }
+  // if (!is_feature_float) { remove_quotation_marks(string_feature_value); }
 
   float float_feature_value = 0.f;
 
@@ -282,20 +282,20 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
   return collections;
 }
 
-void parser::remove_quotation_marks(VW::string_view& sv)
-{
-  const char* trim_list = "'\"";
-  size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
-  size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
+// void parser::remove_quotation_marks(VW::string_view& sv)
+// {
+//   const char* trim_list = "'\"";
+//   size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
+//   size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
 
-  // When the outer quotes pair, we just remove them.
-  // If they don't, we just keep them without throwing any errors.
-  if (sv.size() > 1 && prefix_pos > 0 && suffix_pos > 0 && sv[0] == sv[sv.size() - 1])
-  {
-    sv.remove_prefix(1);
-    sv.remove_suffix(1);
-  }
-}
+//   // When the outer quotes pair, we just remove them.
+//   // If they don't, we just keep them without throwing any errors.
+//   if (sv.size() > 1 && prefix_pos > 0 && suffix_pos > 0 && sv[0] == sv[sv.size() - 1])
+//   {
+//     sv.remove_prefix(1);
+//     sv.remove_suffix(1);
+//   }
+// }
 
 bool parser::check_if_float(VW::string_view& sv)
 {
