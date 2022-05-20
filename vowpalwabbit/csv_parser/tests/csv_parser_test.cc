@@ -16,9 +16,8 @@ TEST(csv_parser_tests, test_csv_standalone_example)
       nullptr, false, nullptr, nullptr);
   auto ae = &VW::get_unused_example(all);
 
-  all->csv_converter->parse_line(
-      all, ae, "\"sepal1.length\";\"sepal.width\";\"petal.length\"\";'petal.width';\"variety\";\ttype;a;k");
-  all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;\"1 2\";1;'test';0");
+  all->csv_converter->parse_line(all, ae, "sepal1.length;sepal.width;petal.length;petal.width;variety;\ttype;a;k");
+  all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;1 2;1;2;0");
   VW::setup_example(*all, ae);
 
   // Check feature numbers
@@ -39,7 +38,7 @@ TEST(csv_parser_tests, test_csv_standalone_example)
   EXPECT_FLOAT_EQ(ae->feature_space['p'].values[0], 1.4);
   EXPECT_FLOAT_EQ(ae->feature_space['p'].values[1], 0.2);
   EXPECT_FLOAT_EQ(ae->feature_space[' '].values[0], 5);
-  EXPECT_FLOAT_EQ(ae->feature_space[' '].values[1], 1);
+  EXPECT_FLOAT_EQ(ae->feature_space[' '].values[1], 10);
 
   VW::finish_example(*all, *ae);
   VW::finish(*all);
