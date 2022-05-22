@@ -130,9 +130,21 @@ Input Options:
     --csv_no_header                         CSV Parser: First line is NOT a header. By default, csv files
                                             are assumed to have a header with feature names (type: bool,
                                             experimental)
+    --csv_remove_quotes                     CSV Parser: Auto remove outer quotes when they pair. (We consider
+                                            the quotes the same as any other common characters without any
+                                            special meaning) (type: bool, experimental)
+    --csv_multilabels                       CSV Parser: The label type would be multilabel. By default, we
+                                            assume the multi columns specified by --csv_label are label components
+                                            (type: bool, experimental)
     --csv_label arg                         CSV Parser: Use the specified integer index as the label column-number
                                             The label (aka response) is always dropped from the input features.
-                                            Default: -1 (last column) (type: int, experimental)
+                                            Also support specify multi columns in order separated with ','
+                                            to represent each component in the label type. Default: -1 (last
+                                            column) (type: str, experimental)
+    --csv_tag arg                           Use the specified integer index as the Id column-number(i.e.
+                                            example ID rather than an input feature)This moves its contents
+                                            into the vw identifying tagand drops it from the input features.
+                                            Default: (None) (type: str, experimental)
     --csv_ns_value arg                      CSV Parser: Scale the namespace values by specifying the float
                                             ratio. e.g. --csv_ns_value=a:0.5,b:0.3,:8 (type: str, keep, experimental)
 Logging Options:
