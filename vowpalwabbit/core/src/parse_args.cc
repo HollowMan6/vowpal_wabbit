@@ -424,14 +424,27 @@ input_options parse_source(VW::workspace& all, options_i& options)
                .help("CSV Parser: First line is NOT a header. By default, csv files "
                      "are assumed to have a header with feature names")
                .experimental())
-      // .add(make_option("tag", all.csv_tag).help("Use the specified integer index as the Id column-number"
-      //                  "(i.e. example ID rather than an input feature)"
-      //                  "This moves its contents into the vw identifying tag"
-      //                  "and drops it from the input features.").experimental())
+      .add(make_option("csv_remove_quotes", all.csv_remove_quotes)
+               .help("CSV Parser: Auto remove outer quotes when they pair. "
+                     "(We consider the quotes the same as any other common characters "
+                     "without any special meaning)")
+               .experimental())
+      .add(make_option("csv_multilabels", all.csv_multilabels)
+               .help("CSV Parser: The label type would be multilabel. By default, "
+                     "we assume the multi columns specified by --csv_label are label components")
+               .experimental())
       .add(make_option("csv_label", all.csv_label)
                .help("CSV Parser: Use the specified integer index as the label column-number "
                      "The label (aka response) is always dropped from the "
-                     "input features. Default: -1 (last column)")
+                     "input features. Also support specify multi columns in order separated "
+                     "with ',' to represent each component in the label type. "
+                     "Default: -1 (last column)")
+               .experimental())
+      .add(make_option("csv_tag", all.csv_tag)
+               .help("Use the specified integer index as the Id column-number"
+                     "(i.e. example ID rather than an input feature)"
+                     "This moves its contents into the vw identifying tag"
+                     "and drops it from the input features. Default: (None)")
                .experimental())
       .add(make_option("csv_ns_value", all.csv_ns_value)
                .keep()

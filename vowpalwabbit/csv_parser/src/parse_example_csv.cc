@@ -99,20 +99,21 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
     {
       for (size_t i = 0; i < elements.size(); i++)
       {
-        // remove_quotation_marks(elements[i]);
+        if (all->csv_remove_quotes) { remove_quotation_marks(elements[i]); }
 
         // Seperate the feature name and namespace from the header.
-        size_t found = elements[i].find_first_of(all->csv_ns_separator);
+        std::vector<VW::string_view> splitted = split(elements[i], all->csv_ns_separator);
         VW::string_view feature_name;
         VW::string_view ns;
-        if (found != VW::string_view::npos)
+        if (splitted.size() == 1) { feature_name = elements[i]; }
+        else if (splitted.size() == 2)
         {
-          ns = elements[i].substr(0, found);
-          feature_name = elements[i].substr(found + 1);
+          ns = splitted[0];
+          feature_name = splitted[1];
         }
         else
         {
-          feature_name = elements[i];
+          THROW("Malformed header for feature name and namespace separator: " << elements[i]);
         }
         _header_fn.emplace_back(feature_name);
         _header_ns.emplace_back(ns);
@@ -127,8 +128,21 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
 
 void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
 {
-  parse_label(all, ae, csv_line);
-  // TODO: parse_tag(all, ae, csv_line);
+  if (label_list.empty() && !all->csv_label.empty())
+  {
+    VW::string_view csv_label(all->csv_label);
+    label_list = list_handler(csv_label, csv_line.size(), "label");
+  }
+  if (tag_list.empty() && !all->csv_tag.empty())
+  {
+    VW::string_view csv_tag(all->csv_tag);
+    tag_list = list_handler(csv_tag, csv_line.size(), "tag");
+    if (tag_list.size() > 1) { THROW("Can only have one tag at most per example!"); }
+  }
+
+  if (!label_list.empty()) { parse_label(all, ae, csv_line); }
+  if (!tag_list.empty()) { parse_tag(all, ae, csv_line); }
+
   parse_namespaces(all, ae, csv_line);
 }
 
@@ -136,19 +150,18 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 {
   all->example_parser->lbl_parser.default_label(ae->l);
 
-  // negative numbers support the "from end of line" convention
-  // (e.g: -1 is last column, -2 is next-to-last, etc.)
-  if (all->csv_label < 0) { label_index = csv_line.size() + all->csv_label; }
-  else
+  std::string label_content;
+  char label_part_separator = ' ';
+  if (all->csv_multilabels) { label_part_separator = ','; }
+
+  for (size_t i = 0; i < label_list.size(); i++)
   {
-    label_index = all->csv_label;
+    VW::string_view label_content_part(csv_line[label_list[i]]);
+    if (all->csv_remove_quotes) { remove_quotation_marks(label_content_part); }
+    label_content += {label_content_part.begin(), label_content_part.end()};
+
+    if (i != label_list.size() - 1) { label_content += label_part_separator; }
   }
-
-  if (label_index >= csv_line.size() || label_index < 0) { THROW("Label index out of range: " << label_index); }
-
-  VW::string_view label_content(csv_line[label_index]);
-
-  // remove_quotation_marks(label_content);
 
   all->example_parser->words.clear();
   VW::tokenize(' ', label_content, all->example_parser->words);
@@ -160,13 +173,23 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   }
 }
 
+void parser::parse_tag(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
+{
+  VW::string_view tag = csv_line[tag_list[0]];
+  if (all->csv_remove_quotes) { remove_quotation_marks(tag); }
+  if (tag.front() == '\'') { tag.remove_prefix(1); }
+  ae->tag.insert(ae->tag.end(), tag.begin(), tag.end());
+}
+
 void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line)
 {
   _anon = 0;
   for (size_t i = 0; i < _header_ns.size(); i++)
   {
-    // Skip label
-    if (label_index == i) { continue; }
+    // Skip label and tag
+    if (!label_list.empty() && std::find(label_list.begin(), label_list.end(), i) != label_list.end() ||
+        (!tag_list.empty() && std::find(tag_list.begin(), tag_list.end(), i) != tag_list.end()))
+    { continue; }
 
     std::string ns;
     bool new_index = false;
@@ -202,7 +225,7 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
   uint64_t word_hash;
   float _v;
   bool is_feature_float = check_if_float(string_feature_value);
-  // if (!is_feature_float) { remove_quotation_marks(string_feature_value); }
+  if (!is_feature_float && all->csv_remove_quotes) { remove_quotation_marks(string_feature_value); }
 
   float float_feature_value = 0.f;
 
@@ -258,44 +281,42 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
   size_t pointer = 0;
   // Trim extra characters that are useless for us to read
   const char* trim_list = "\r\n\t\xef\xbb\xbf\f\v ";
-  for (size_t i = 0; i < sv.length(); i++)
+
+  if (sv.empty())
+  {
+    collections.emplace_back(VW::string_view());
+    return collections;
+  }
+
+  for (size_t i = 0; i <= sv.length(); i++)
   {
     // You can't escape the csv separator by including it inside the quotation marks
-    if (sv[i] == ch[0])
+    if (i == sv.length() || sv[i] == ch[0])
     {
       VW::string_view element(&sv[pointer], i - pointer);
       element.remove_prefix(std::min(element.find_first_not_of(trim_list), element.size()));
       element.remove_suffix(std::min(element.size() - element.find_last_not_of(trim_list) - 1, element.size()));
       collections.emplace_back(element);
-      pointer = i + 1;
+      if (i < sv.length() - 1) { pointer = i + 1; }
     }
   }
-  VW::string_view element;
-  if (pointer >= sv.size()) { element = VW::string_view(&sv[pointer - 1], sv.size() - pointer); }
-  else
-  {
-    element = VW::string_view(&sv[pointer], sv.size() - pointer);
-  }
-  element.remove_prefix(std::min(element.find_first_not_of(trim_list), element.size()));
-  element.remove_suffix(std::min(element.size() - element.find_last_not_of(trim_list) - 1, element.size()));
-  collections.emplace_back(element);
   return collections;
 }
 
-// void parser::remove_quotation_marks(VW::string_view& sv)
-// {
-//   const char* trim_list = "'\"";
-//   size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
-//   size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
+void parser::remove_quotation_marks(VW::string_view& sv)
+{
+  const char* trim_list = "'\"";
+  size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
+  size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
 
-//   // When the outer quotes pair, we just remove them.
-//   // If they don't, we just keep them without throwing any errors.
-//   if (sv.size() > 1 && prefix_pos > 0 && suffix_pos > 0 && sv[0] == sv[sv.size() - 1])
-//   {
-//     sv.remove_prefix(1);
-//     sv.remove_suffix(1);
-//   }
-// }
+  // When the outer quotes pair, we just remove them.
+  // If they don't, we just keep them without throwing any errors.
+  if (sv.size() > 1 && prefix_pos > 0 && suffix_pos > 0 && sv[0] == sv[sv.size() - 1])
+  {
+    sv.remove_prefix(1);
+    sv.remove_suffix(1);
+  }
+}
 
 bool parser::check_if_float(VW::string_view& sv)
 {
@@ -304,6 +325,35 @@ bool parser::check_if_float(VW::string_view& sv)
   char* ptr;
   std::strtof(s.c_str(), &ptr);
   return (*ptr) == '\0';
+}
+
+std::vector<unsigned long> parser::list_handler(VW::string_view& sv, size_t size, const std::string& error_msg)
+{
+  std::vector<VW::string_view> sv_list = split(sv, ",");
+  std::vector<unsigned long> list;
+  for (size_t i = 0; i < sv_list.size(); i++)
+  {
+    std::string s = {sv_list[i].begin(), sv_list[i].end()};
+    if (s.empty()) { THROW("Empty " << error_msg << " value at " << i << "!"); }
+    char* ptr;
+    long int value = std::strtol(s.c_str(), &ptr, 0);
+    if ((*ptr) == '\0')
+    {
+      // negative numbers support the "from end of line" convention
+      // (e.g: -1 is last column, -2 is next-to-last, etc.)
+      if (value < 0) { value = size + value; }
+      if (value >= size || value < 0) { THROW(error_msg << " index out of range at " << i << ": " << value); }
+      else
+      {
+        list.push_back(value);
+      }
+    }
+    else
+    {
+      THROW("Unable to parse " << error_msg << " at " << i << "!");
+    }
+  }
+  return list;
 }
 
 }  // namespace csv

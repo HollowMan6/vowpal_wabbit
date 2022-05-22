@@ -31,19 +31,22 @@ private:
   std::vector<std::string> _header_fn;
   std::vector<std::string> _header_ns;
   uint64_t _channel_hash;
-  int label_index;
+  std::vector<unsigned long> label_list;
+  std::vector<unsigned long> tag_list;
   size_t _anon;
   std::map<std::string, float> ns_value;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
+  void parse_tag(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line);
   void parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
       VW::string_view string_feature_value, const char* ns);
   std::vector<VW::string_view> split(VW::string_view sv, std::string ch);
-  // void remove_quotation_marks(VW::string_view& sv);
+  void remove_quotation_marks(VW::string_view& sv);
   bool check_if_float(VW::string_view& sv);
+  std::vector<unsigned long> list_handler(VW::string_view& sv, size_t size, const std::string& error_msg);
 };
 }  // namespace csv
 }  // namespace parsers
