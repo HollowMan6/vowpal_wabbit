@@ -158,10 +158,13 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   {
     VW::string_view label_content_part(csv_line[label_list[i]]);
     if (all->csv_remove_quotes) { remove_quotation_marks(label_content_part); }
+    // Skip the empty cells
+    if (label_content_part.empty()) { continue; }
     label_content += {label_content_part.begin(), label_content_part.end()};
-
-    if (i != label_list.size() - 1) { label_content += label_part_separator; }
+    label_content += label_part_separator;
   }
+
+  if (!label_content.empty() && label_content.back() == label_part_separator) { label_content.pop_back(); }
 
   all->example_parser->words.clear();
   VW::tokenize(' ', label_content, all->example_parser->words);
