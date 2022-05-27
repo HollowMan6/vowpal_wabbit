@@ -17,13 +17,16 @@ namespace parsers
 {
 namespace csv
 {
+struct parser_options;
 int csv_to_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 
 class parser
 {
 public:
   parser() = default;
+  parser(parser_options options);
 
+  parser_options m_options;
   int parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae);
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
 

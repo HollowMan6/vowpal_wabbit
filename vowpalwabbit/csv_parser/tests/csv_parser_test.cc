@@ -17,9 +17,9 @@ TEST(csv_parser_tests, test_csv_standalone_example)
       nullptr, false, nullptr, nullptr);
   auto ae = &VW::get_unused_example(all);
 
-  all->csv_converter->parse_line(
-      all, ae, "\t\"sepal1.length\";sepal.width; \"petal.length\"\";'petal.width';\"variety1\";b;\ttype;a;k");
-  all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;1; 2;1;''test';0");
+  all->csv_converter->parse_line(all, ae,
+      "\xef\xbb\xbf\"sepal1.length\";sepal.width;\"petal.length\"\";'petal.width';\"variety1\";b;\xef\xbb\xbftype;a;k");
+  all->csv_converter->parse_line(all, ae, "5.1;3.5;1.4;.2;1;2;1;''test';0");
   VW::setup_example(*all, ae);
 
   // Check example labels and tags
