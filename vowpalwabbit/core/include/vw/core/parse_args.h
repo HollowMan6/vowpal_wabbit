@@ -6,6 +6,7 @@
 #include "vw/common/string_view.h"
 #include "vw/common/text_utils.h"
 #include "vw/config/options.h"
+#include "vw/core/global_data.h"
 #include "vw/core/text_utils.h"
 #include "vw/core/vw_fwd.h"
 
@@ -29,6 +30,9 @@ struct input_options
   bool chain_hash_json;
   bool flatbuffer = false;
   bool csv = false;
+#ifdef BUILD_CSV
+  VW::parsers::csv::parser_options csv_opts;
+#endif
 #ifdef BUILD_EXTERNAL_PARSER
   // pointer because it is an incomplete type
   std::unique_ptr<VW::external::parser_options> ext_opts;
@@ -50,7 +54,9 @@ inline bool ends_with(const std::string& full_string, const std::string& ending)
   return VW::ends_with(full_string, ending);
 }
 
-void handling_separator(VW::workspace& all, std::string& str, const std::string& name);
+#ifdef BUILD_CSV
+void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
+#endif
 std::vector<extent_term> parse_full_name_interactions(VW::workspace& all, VW::string_view str);
 
 namespace VW

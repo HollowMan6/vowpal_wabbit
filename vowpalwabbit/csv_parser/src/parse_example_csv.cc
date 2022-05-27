@@ -4,7 +4,9 @@
 
 #include "vw/csv_parser/parse_example_csv.h"
 
+#include "vw/config/option_group_definition.h"
 #include "vw/core/best_constant.h"
+#include "vw/core/parse_args.h"
 #include "vw/core/parse_primitives.h"
 #include "vw/core/parser.h"
 
@@ -21,6 +23,8 @@ int csv_to_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
   return all->csv_converter->parse_csv(all, buf, examples[0]);
 }
 
+parser::parser(parser_options options) : m_options(options) {}
+
 int parser::parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae)
 {
   bool first_read = false;
@@ -28,7 +32,7 @@ int parser::parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae)
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
   // Read the data if header exists.
-  if (!all->csv_no_header && first_read) { num_bytes_consumed += read_line(all, ae, buf); }
+  if (!m_options.csv_no_header && first_read) { num_bytes_consumed += read_line(all, ae, buf); }
   return static_cast<int>(num_bytes_consumed);
 }
 
@@ -59,12 +63,12 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
   if (csv_line.empty()) { THROW("Malformed CSV, empty line exists!"); }
   else
   {
-    std::vector<VW::string_view> elements = split(csv_line, all->csv_separator);
+    std::vector<VW::string_view> elements = split(csv_line, m_options.csv_separator);
 
     // Store the ns value from CmdLine
-    if (_header_ns.empty() && !all->csv_ns_value.empty())
+    if (_header_ns.empty() && !m_options.csv_ns_value.empty())
     {
-      std::vector<VW::string_view> ns_values = split(all->csv_ns_value, ",");
+      std::vector<VW::string_view> ns_values = split(m_options.csv_ns_value, ",");
       for (size_t i = 0; i < ns_values.size(); i++)
       {
         std::vector<VW::string_view> pair = split(ns_values[i], ":");
@@ -81,12 +85,12 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
     }
 
     // If no header present, will use empty features
-    if (all->csv_no_header && _header_fn.empty())
+    if (m_options.csv_no_header && _header_fn.empty())
     {
       for (size_t i = 0; i < elements.size(); i++)
       {
-        _header_fn.emplace_back(std::string());
-        _header_ns.emplace_back(std::string());
+        _header_fn.emplace_back();
+        _header_ns.emplace_back();
       }
     }
 
@@ -95,14 +99,14 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
       THROW(
           "CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size() << " elements!");
     }
-    else if (!all->csv_no_header && _header_fn.empty())
+    else if (!m_options.csv_no_header && _header_fn.empty())
     {
       for (size_t i = 0; i < elements.size(); i++)
       {
-        if (all->csv_remove_quotes) { remove_quotation_marks(elements[i]); }
+        if (m_options.csv_remove_quotes) { remove_quotation_marks(elements[i]); }
 
         // Seperate the feature name and namespace from the header.
-        std::vector<VW::string_view> splitted = split(elements[i], all->csv_ns_separator);
+        std::vector<VW::string_view> splitted = split(elements[i], m_options.csv_ns_separator);
         VW::string_view feature_name;
         VW::string_view ns;
         if (splitted.size() == 1) { feature_name = elements[i]; }
@@ -128,14 +132,14 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
 
 void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
 {
-  if (label_list.empty() && !all->csv_label.empty())
+  if (label_list.empty() && !m_options.csv_label.empty())
   {
-    VW::string_view csv_label(all->csv_label);
+    VW::string_view csv_label(m_options.csv_label);
     label_list = list_handler(csv_label, csv_line.size(), "label");
   }
-  if (tag_list.empty() && !all->csv_tag.empty())
+  if (tag_list.empty() && !m_options.csv_tag.empty())
   {
-    VW::string_view csv_tag(all->csv_tag);
+    VW::string_view csv_tag(m_options.csv_tag);
     tag_list = list_handler(csv_tag, csv_line.size(), "tag");
     if (tag_list.size() > 1) { THROW("Can only have one tag at most per example!"); }
   }
@@ -152,12 +156,12 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 
   std::string label_content;
   char label_part_separator = ' ';
-  if (all->csv_multilabels) { label_part_separator = ','; }
+  if (m_options.csv_multilabels) { label_part_separator = ','; }
 
   for (size_t i = 0; i < label_list.size(); i++)
   {
     VW::string_view label_content_part(csv_line[label_list[i]]);
-    if (all->csv_remove_quotes) { remove_quotation_marks(label_content_part); }
+    if (m_options.csv_remove_quotes) { remove_quotation_marks(label_content_part); }
     // Skip the empty cells
     if (label_content_part.empty()) { continue; }
     label_content += {label_content_part.begin(), label_content_part.end()};
@@ -179,8 +183,8 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
 void parser::parse_tag(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
 {
   VW::string_view tag = csv_line[tag_list[0]];
-  if (all->csv_remove_quotes) { remove_quotation_marks(tag); }
-  if (tag.front() == '\'') { tag.remove_prefix(1); }
+  if (m_options.csv_remove_quotes) { remove_quotation_marks(tag); }
+  if (!tag.empty() && tag.front() == '\'') { tag.remove_prefix(1); }
   ae->tag.insert(ae->tag.end(), tag.begin(), tag.end());
 }
 
@@ -228,7 +232,7 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
   uint64_t word_hash;
   float _v;
   bool is_feature_float = check_if_float(string_feature_value);
-  if (!is_feature_float && all->csv_remove_quotes) { remove_quotation_marks(string_feature_value); }
+  if (!is_feature_float && m_options.csv_remove_quotes) { remove_quotation_marks(string_feature_value); }
 
   float float_feature_value = 0.f;
 
@@ -283,7 +287,7 @@ std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
   std::vector<VW::string_view> collections;
   size_t pointer = 0;
   // Trim extra characters that are useless for us to read
-  const char* trim_list = "\r\n\t\xef\xbb\xbf\f\v ";
+  const char* trim_list = "\r\n\xef\xbb\xbf\f\v";
 
   if (sv.empty())
   {

@@ -120,31 +120,6 @@ Input Options:
                                             keep)
     --flatbuffer                            Data file will be interpreted as a flatbuffer file (type: bool,
                                             experimental)
-    --csv                                   Data file will be interpreted as a CSV file (type: bool, experimental)
-    --csv_separator arg                     CSV Parser: Specify field separator in one character. (type:
-                                            str, default: ,, experimental)
-    --csv_ns_separator arg                  CSV Parser: Specify separator for namespace and feature name
-                                            of the header cells in one character. If no separator exists
-                                            in the header cells, then the namespace would be empty. (type:
-                                            str, default: |, experimental)
-    --csv_no_header                         CSV Parser: First line is NOT a header. By default, CSV files
-                                            are assumed to have a header with feature and/or namespaces names.
-                                            (type: bool, default: false, experimental)
-    --csv_remove_quotes                     CSV Parser: Auto remove outer quotes when they pair. (We consider
-                                            the quotes the same as any other common characters without any
-                                            special meaning) (type: bool, default: false, experimental)
-    --csv_multilabels                       CSV Parser: The label type is multilabels. By default, we assume
-                                            the multi-columns specified by --csv_label are label components
-                                            (type: bool, default: false, experimental)
-    --csv_label arg                         CSV Parser: Use the specified integer index as the label column
-                                            number. The columns specified are dropped from the input features.
-                                            Also, support specifying multi-columns in order separated with
-                                            ',' to represent each component in the label separated by spaces.
-                                            (type: str, default: -1, experimental)
-    --csv_tag arg                           Use the specified integer index as the tag.This drops it from
-                                            the input features. (type: str, experimental)
-    --csv_ns_value arg                      CSV Parser: Scale the namespace values by specifying the float
-                                            ratio. e.g. a:0.5,b:0.3,:8 (type: str, keep, experimental)
 Logging Options:
     --quiet                                 Don't output diagnostics and progress updates. Supplying this
                                             implies --log_level off and --driver_output_off. Supplying this

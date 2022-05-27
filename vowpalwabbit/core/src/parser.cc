@@ -627,9 +627,9 @@ void enable_sources(VW::workspace& all, bool quiet, size_t passes, input_options
       }
 #endif
 #ifdef BUILD_CSV
-      else if (input_options.csv)
+      else if (input_options.csv_opts.enabled)
       {
-        all.csv_converter = VW::make_unique<VW::parsers::csv::parser>();
+        all.csv_converter = VW::make_unique<VW::parsers::csv::parser>(input_options.csv_opts);
         all.example_parser->reader = VW::parsers::csv::csv_to_examples;
       }
 #endif

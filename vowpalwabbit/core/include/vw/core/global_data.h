@@ -84,10 +84,25 @@ namespace flatbuffer
 class parser;
 }
 
+#ifdef BUILD_CSV
 namespace csv
 {
 class parser;
-}
+struct parser_options
+{
+  bool enabled = false;
+  // CSV parsing configurations
+  std::string csv_separator = ",";
+  std::string csv_ns_separator = "|";
+  bool csv_no_header = false;
+  bool csv_remove_quotes = false;
+  bool csv_multilabels = false;
+  std::string csv_label = "-1";
+  std::string csv_tag = "";
+  std::string csv_ns_value = "";
+};
+}  // namespace csv
+#endif
 }  // namespace parsers
 }  // namespace VW
 
@@ -314,16 +329,6 @@ public:
 
   bool no_daemon = false;  // If a model was saved in daemon or active learning mode, force it to accept local input
                            // when loaded instead.
-
-  // CSV parsing configurations
-  std::string csv_separator = ",";
-  std::string csv_ns_separator = "|";
-  bool csv_no_header = false;
-  bool csv_remove_quotes = false;
-  bool csv_multilabels = false;
-  std::string csv_label = "-1";
-  std::string csv_tag = "";
-  std::string csv_ns_value = "";
 
   // runtime accounting variables.
   float initial_t;
