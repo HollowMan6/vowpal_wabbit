@@ -13,7 +13,8 @@ TEST(csv_parser_tests, test_csv_standalone_example)
 {
   auto all = VW::initialize(
       "--no_stdin --quiet --csv --csv_separator ; --csv_ns_separator . --csv_label -5,5 "
-      "--csv_remove_quotes --csv_tag -2 --csv_ns_value :5,sepal1:1.1",
+      "--csv_remove_quotes --csv_tag -2 --csv_ns_value :5,sepal1:1.1 "
+      "--csv_header sepal1.length,sepal.width,petal.length\",petal.width,type,k,s,width",
       nullptr, false, nullptr, nullptr);
   auto ae = &VW::get_unused_example(all);
 

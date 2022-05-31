@@ -423,10 +423,14 @@ input_options parse_source(VW::workspace& all, options_i& options)
                      "one character. If no separator exists in the header cells, "
                      "then the namespace would be empty. ")
                .experimental())
-      .add(make_option("csv_no_header", parsed_options.csv_opts.csv_no_header)
-               .default_value(false)
-               .help("CSV Parser: First line is NOT a header. By default, CSV files "
-                     "are assumed to have a header with feature and/or namespaces names. ")
+      .add(make_option("csv_header", parsed_options.csv_opts.csv_header)
+               .default_value("1")
+               .help("CSV Parser: Input the feature names (and/or combined with namespaces using the "
+                     "--csv_ns_separator) separated with ','. By default, with value "
+                     "'1', CSV files are assumed to have a header with feature and/or namespaces "
+                     "names in the CSV first line. While with value '0', CSV files are assumed to "
+                     "have no header. If a string is inputted, we will auto-detect the header from "
+                     "CSV first line and get rid of it. ")
                .experimental())
       .add(make_option("csv_remove_quotes", parsed_options.csv_opts.csv_remove_quotes)
                .default_value(false)

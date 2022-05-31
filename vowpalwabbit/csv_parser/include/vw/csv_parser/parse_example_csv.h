@@ -26,18 +26,20 @@ public:
   parser() = default;
   parser(parser_options options);
 
-  parser_options m_options;
+  void reset();
   int parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae);
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
 
 private:
   std::vector<std::string> _header_fn;
   std::vector<std::string> _header_ns;
-  uint64_t _channel_hash;
-  std::vector<unsigned long> label_list;
-  std::vector<unsigned long> tag_list;
   size_t _anon;
-  std::map<std::string, float> ns_value;
+  std::map<std::string, float> _ns_value;
+  bool _no_header;
+  parser_options _options;
+  uint64_t _channel_hash;
+  std::vector<unsigned long> _label_list;
+  std::vector<unsigned long> _tag_list;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);

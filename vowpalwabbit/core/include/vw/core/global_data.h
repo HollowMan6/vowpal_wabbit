@@ -94,7 +94,7 @@ struct parser_options
   // CSV parsing configurations
   std::string csv_separator = ",";
   std::string csv_ns_separator = "|";
-  bool csv_no_header = false;
+  std::string csv_header = "1";
   bool csv_remove_quotes = false;
   bool csv_multilabels = false;
   std::string csv_label = "-1";
