@@ -166,10 +166,6 @@ public:
   std::unique_ptr<VW::parsers::flatbuffer::parser> flat_converter;
 #endif
 
-#ifdef BUILD_CSV
-  std::unique_ptr<VW::parsers::csv::parser> csv_converter;
-#endif
-
   // This field is experimental and subject to change.
   // Used to implement the external binary parser.
   std::vector<std::function<void(VW::metric_sink&)>> metric_output_hooks;

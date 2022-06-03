@@ -29,7 +29,6 @@ struct input_options
   bool compressed;
   bool chain_hash_json;
   bool flatbuffer = false;
-  bool csv = false;
 #ifdef BUILD_CSV
   VW::parsers::csv::parser_options csv_opts;
 #endif

@@ -4,7 +4,6 @@
 
 #include "vw/csv_parser/parse_example_csv.h"
 
-#include "vw/config/option_group_definition.h"
 #include "vw/core/best_constant.h"
 #include "vw/core/parse_args.h"
 #include "vw/core/parse_primitives.h"
@@ -18,12 +17,16 @@ namespace parsers
 {
 namespace csv
 {
-int csv_to_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
+int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
 {
-  return all->csv_converter->parse_csv(all, buf, examples[0]);
+  bool keep_reading = all->custom_parser->next(*all, buf, examples);
+  return keep_reading ? 1 : 0;
 }
 
-parser::parser(parser_options options) : _options(options) {}
+std::unique_ptr<parser> parser::get_csv_parser(VW::workspace* all, const parser_options& options)
+{
+  return VW::make_unique<parser>(options, all->logger);
+}
 
 void parser::reset()
 {
@@ -34,7 +37,7 @@ void parser::reset()
   _no_header = false;
 }
 
-int parser::parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae)
+int parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
 {
   bool first_read = false;
   if (_header_fn.empty()) { first_read = true; }
@@ -193,7 +196,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
 void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
 {
   if (!_label_list.empty()) { parse_label(all, ae, csv_line); }
-  if (!_tag_list.empty()) { parse_tag(all, ae, csv_line); }
+  if (!_tag_list.empty()) { parse_tag(ae, csv_line); }
 
   parse_namespaces(all, ae, csv_line);
 }
@@ -228,7 +231,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   }
 }
 
-void parser::parse_tag(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
+void parser::parse_tag(VW::example* ae, std::vector<VW::string_view> csv_line)
 {
   VW::string_view tag = csv_line[_tag_list[0]];
   if (_options.csv_remove_quotes) { remove_quotation_marks(tag); }
