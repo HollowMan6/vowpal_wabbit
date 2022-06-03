@@ -186,10 +186,6 @@ public:
   std::unique_ptr<VW::parsers::flatbuffer::parser> flat_converter;
 #endif
 
-#ifdef BUILD_CSV
-  std::unique_ptr<VW::parsers::csv::parser> csv_converter;
-#endif
-
 #ifdef BUILD_EXTERNAL_PARSER
   std::unique_ptr<VW::external::parser> external_parser;
 #endif

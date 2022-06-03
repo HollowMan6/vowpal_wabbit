@@ -18,17 +18,29 @@ namespace parsers
 namespace csv
 {
 struct parser_options;
-int csv_to_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
+int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 
-class parser
+class parser : public VW::details::input_parser
 {
 public:
-  parser() = default;
-  parser(parser_options options);
+  explicit parser(parser_options options, VW::io::logger logger_)
+      : VW::details::input_parser("csv"), _options(options), logger(std::move(logger_))
+  {
+  }
+  virtual ~parser() = default;
+  static std::unique_ptr<parser> get_csv_parser(VW::workspace* all, const parser_options& options);
+
+  int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);
+  bool next(VW::workspace& all, io_buf& buf, VW::multi_ex& examples) override
+  {
+    return parse_csv(&all, examples[0], buf);
+  }
 
   void reset();
-  int parse_csv(VW::workspace* all, io_buf& buf, VW::example* ae);
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
+
+protected:
+  VW::io::logger logger;
 
 private:
   std::vector<std::string> _header_fn;
@@ -44,7 +56,7 @@ private:
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
-  void parse_tag(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
+  void parse_tag(VW::example* ae, std::vector<VW::string_view> csv_line);
   void parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line);
   void parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
       VW::string_view string_feature_value, const char* ns);
