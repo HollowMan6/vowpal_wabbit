@@ -5,6 +5,7 @@
 #pragma once
 
 #include "vw/common/text_utils.h"
+#include "vw/config/option_group_definition.h"
 #include "vw/core/global_data.h"
 #include "vw/core/v_array.h"
 
@@ -29,6 +30,9 @@ public:
   }
   virtual ~parser() = default;
   static std::unique_ptr<parser> get_csv_parser(VW::workspace* all, const parser_options& options);
+  static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
+  static void set_parse_args(
+      VW::workspace& all, VW::config::option_group_definition& in_options, parser_options& parsed_options);
 
   int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);
   bool next(VW::workspace& all, io_buf& buf, VW::multi_ex& examples) override

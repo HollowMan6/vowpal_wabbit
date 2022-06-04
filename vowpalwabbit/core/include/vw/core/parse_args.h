@@ -53,9 +53,6 @@ inline bool ends_with(const std::string& full_string, const std::string& ending)
   return VW::ends_with(full_string, ending);
 }
 
-#ifdef BUILD_CSV
-void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
-#endif
 std::vector<extent_term> parse_full_name_interactions(VW::workspace& all, VW::string_view str);
 
 namespace VW

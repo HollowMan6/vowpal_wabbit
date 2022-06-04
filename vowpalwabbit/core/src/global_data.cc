@@ -39,9 +39,6 @@
 #ifdef BUILD_FLATBUFFERS
 #  include "vw/fb_parser/parse_example_flatbuffer.h"
 #endif
-#ifdef BUILD_CSV
-#  include "vw/csv_parser/parse_example_csv.h"
-#endif
 #ifdef BUILD_EXTERNAL_PARSER
 #  include "parse_example_external.h"
 #endif

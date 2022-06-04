@@ -54,6 +54,10 @@
 #include <tuple>
 #include <utility>
 
+#ifdef BUILD_CSV
+#  include "vw/csv_parser/parse_example_csv.h"
+#endif
+
 #ifdef BUILD_EXTERNAL_PARSER
 #  include "parse_example_binary.h"
 #endif
@@ -408,60 +412,10 @@ input_options parse_source(VW::workspace& all, options_i& options)
                      "hashed as A^B^C."))
       .add(make_option("flatbuffer", parsed_options.flatbuffer)
                .help("Data file will be interpreted as a flatbuffer file")
-               .experimental())
+               .experimental());
 #ifdef BUILD_CSV
-      .add(make_option("csv", parsed_options.csv_opts.enabled)
-               .help("Data file will be interpreted as a CSV file")
-               .experimental())
-      .add(make_option("csv_separator", parsed_options.csv_opts.csv_separator)
-               .default_value(",")
-               .help("CSV Parser: Specify field separator in one character. ")
-               .experimental())
-      .add(make_option("csv_ns_separator", parsed_options.csv_opts.csv_ns_separator)
-               .default_value("|")
-               .help("CSV Parser: Specify separator for namespace and feature name of the header cells in "
-                     "one character. If no separator exists in the header cells, "
-                     "then the namespace would be empty. ")
-               .experimental())
-      .add(make_option("csv_header", parsed_options.csv_opts.csv_header)
-               .default_value("1")
-               .help("CSV Parser: Input the feature names (and/or combined with namespaces using the "
-                     "--csv_ns_separator) separated with ','. By default, with value "
-                     "'1', CSV files are assumed to have a header with feature and/or namespaces "
-                     "names in the CSV first line. While with value '0', CSV files are assumed to "
-                     "have no header. If a string is inputted, we will auto-detect the header from "
-                     "CSV first line and get rid of it. ")
-               .experimental())
-      .add(make_option("csv_remove_quotes", parsed_options.csv_opts.csv_remove_quotes)
-               .default_value(false)
-               .help("CSV Parser: Auto remove outer quotes when they pair. "
-                     "(We consider the quotes the same as any other common characters "
-                     "without any special meaning)")
-               .experimental())
-      .add(make_option("csv_multilabels", parsed_options.csv_opts.csv_multilabels)
-               .default_value(false)
-               .help("CSV Parser: The label type is multilabels. By default, "
-                     "we assume the multi-columns specified by --csv_label are label components")
-               .experimental())
-      .add(make_option("csv_label", parsed_options.csv_opts.csv_label)
-               .default_value("-1")
-               .help("CSV Parser: Use the specified integer index as the label column number. "
-                     "The columns specified are dropped from the "
-                     "input features. Also, support specifying multi-columns in order separated "
-                     "with ',' to represent each component in the label separated by spaces. ")
-               .experimental())
-      .add(make_option("csv_tag", parsed_options.csv_opts.csv_tag)
-               .default_value("")
-               .help("Use the specified integer index as the tag."
-                     "This drops it from the input features. ")
-               .experimental())
-      .add(make_option("csv_ns_value", parsed_options.csv_opts.csv_ns_value)
-               .default_value("")
-               .help("CSV Parser: Scale the namespace values by specifying the float "
-                     "ratio. e.g. a:0.5,b:0.3,:8 ")
-               .experimental())
+  VW::parsers::csv::parser::set_parse_args(all, input_options, parsed_options.csv_opts);
 #endif
-      ;
 #ifdef BUILD_EXTERNAL_PARSER
   VW::external::parser::set_parse_args(input_options, parsed_options);
 #endif
@@ -506,16 +460,6 @@ input_options parse_source(VW::workspace& all, options_i& options)
     all.holdout_set_off = true;
     *(all.trace_message) << "Making holdout_set_off=true since output regularizer specified" << endl;
   }
-
-#ifdef BUILD_CSV
-  if (parsed_options.csv_opts.enabled)
-  {
-    handling_csv_separator(all, parsed_options.csv_opts.csv_ns_separator, "CSV namespace separator");
-    handling_csv_separator(all, parsed_options.csv_opts.csv_separator, "CSV separator");
-    if (parsed_options.csv_opts.csv_ns_separator[0] == parsed_options.csv_opts.csv_separator[0])
-    { THROW("CSV namespace and field separator are the same character!"); }
-  }
-#endif
 
   return parsed_options;
 }
@@ -607,38 +551,6 @@ std::tuple<std::string, std::string> extract_ignored_feature(VW::string_view nam
 }
 }  // namespace details
 }  // namespace VW
-
-#ifdef BUILD_CSV
-void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name)
-{
-  if (str.length() > 1)
-  {
-    char result = str[0];
-    if (str[0] == '\\')
-    {
-      switch (str[1])
-      {
-        // Allow to specify \t as tabs
-        // As pressing tabs usually means auto completion
-        case 't':
-          result = '\t';
-          break;
-        default:
-          break;
-      }
-    }
-
-    if ((result != str[0] && str.length() > 2) || result == str[0])
-    {
-      all.logger.err_warn(
-          "Multiple characters passed as {}, only the first one will be "
-          "read and the rest will be ignored.",
-          name);
-    }
-    str = result;
-  }
-}
-#endif
 
 std::vector<VW::namespace_index> parse_char_interactions(VW::string_view input, VW::io::logger& logger)
 {
