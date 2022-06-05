@@ -88,19 +88,7 @@ class parser;
 namespace csv
 {
 class parser;
-struct parser_options
-{
-  bool enabled = false;
-  // CSV parsing configurations
-  std::string csv_separator = ",";
-  std::string csv_ns_separator = "|";
-  std::string csv_header = "1";
-  bool csv_remove_quotes = false;
-  bool csv_multilabels = false;
-  std::string csv_label = "-1";
-  std::string csv_tag = "";
-  std::string csv_ns_value = "";
-};
+struct parser_options;
 }  // namespace csv
 #endif
 }  // namespace parsers

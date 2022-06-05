@@ -23,11 +23,6 @@ int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
   return keep_reading ? 1 : 0;
 }
 
-std::unique_ptr<parser> parser::get_csv_parser(VW::workspace* all, const parser_options& options)
-{
-  return VW::make_unique<parser>(options, all->logger);
-}
-
 void parser::handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name)
 {
   if (str.length() > 1)
@@ -59,23 +54,23 @@ void parser::handling_csv_separator(VW::workspace& all, std::string& str, const 
 }
 
 void parser::set_parse_args(
-    VW::workspace& all, VW::config::option_group_definition& in_options, parser_options& parsed_options)
+    VW::workspace& all, VW::config::option_group_definition& in_options, parser_options* parsed_options)
 {
   in_options
-      .add(VW::config::make_option("csv", parsed_options.enabled)
+      .add(VW::config::make_option("csv", parsed_options->enabled)
                .help("Data file will be interpreted as a CSV file")
                .experimental())
-      .add(VW::config::make_option("csv_separator", parsed_options.csv_separator)
+      .add(VW::config::make_option("csv_separator", parsed_options->csv_separator)
                .default_value(",")
                .help("CSV Parser: Specify field separator in one character. ")
                .experimental())
-      .add(VW::config::make_option("csv_ns_separator", parsed_options.csv_ns_separator)
+      .add(VW::config::make_option("csv_ns_separator", parsed_options->csv_ns_separator)
                .default_value("|")
                .help("CSV Parser: Specify separator for namespace and feature name of the header cells in "
                      "one character. If no separator exists in the header cells, "
                      "then the namespace would be empty. ")
                .experimental())
-      .add(VW::config::make_option("csv_header", parsed_options.csv_header)
+      .add(VW::config::make_option("csv_header", parsed_options->csv_header)
                .default_value("1")
                .help("CSV Parser: Input the feature names (and/or combined with namespaces using the "
                      "--csv_ns_separator) separated with ','. By default, with value "
@@ -84,40 +79,40 @@ void parser::set_parse_args(
                      "have no header. If a string is inputted, we will auto-detect the header from "
                      "CSV first line and get rid of it. ")
                .experimental())
-      .add(VW::config::make_option("csv_remove_quotes", parsed_options.csv_remove_quotes)
+      .add(VW::config::make_option("csv_remove_quotes", parsed_options->csv_remove_quotes)
                .default_value(false)
                .help("CSV Parser: Auto remove outer quotes when they pair. "
                      "(We consider the quotes the same as any other common characters "
                      "without any special meaning)")
                .experimental())
-      .add(VW::config::make_option("csv_multilabels", parsed_options.csv_multilabels)
+      .add(VW::config::make_option("csv_multilabels", parsed_options->csv_multilabels)
                .default_value(false)
                .help("CSV Parser: The label type is multilabels. By default, "
                      "we assume the multi-columns specified by --csv_label are label components")
                .experimental())
-      .add(VW::config::make_option("csv_label", parsed_options.csv_label)
+      .add(VW::config::make_option("csv_label", parsed_options->csv_label)
                .default_value("-1")
                .help("CSV Parser: Use the specified integer index as the label column number. "
                      "The columns specified are dropped from the "
                      "input features. Also, support specifying multi-columns in order separated "
                      "with ',' to represent each component in the label separated by spaces. ")
                .experimental())
-      .add(VW::config::make_option("csv_tag", parsed_options.csv_tag)
+      .add(VW::config::make_option("csv_tag", parsed_options->csv_tag)
                .default_value("")
                .help("Use the specified integer index as the tag."
                      "This drops it from the input features. ")
                .experimental())
-      .add(VW::config::make_option("csv_ns_value", parsed_options.csv_ns_value)
+      .add(VW::config::make_option("csv_ns_value", parsed_options->csv_ns_value)
                .default_value("")
                .help("CSV Parser: Scale the namespace values by specifying the float "
                      "ratio. e.g. a:0.5,b:0.3,:8 ")
                .experimental());
 
-  if (parsed_options.enabled)
+  if (parsed_options->enabled)
   {
-    handling_csv_separator(all, parsed_options.csv_ns_separator, "CSV namespace separator");
-    handling_csv_separator(all, parsed_options.csv_separator, "CSV separator");
-    if (parsed_options.csv_ns_separator[0] == parsed_options.csv_separator[0])
+    handling_csv_separator(all, parsed_options->csv_ns_separator, "CSV namespace separator");
+    handling_csv_separator(all, parsed_options->csv_separator, "CSV separator");
+    if (parsed_options->csv_ns_separator[0] == parsed_options->csv_separator[0])
     { THROW("CSV namespace and field separator are the same character!"); }
   }
 }

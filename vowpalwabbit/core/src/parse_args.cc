@@ -414,7 +414,8 @@ input_options parse_source(VW::workspace& all, options_i& options)
                .help("Data file will be interpreted as a flatbuffer file")
                .experimental());
 #ifdef BUILD_CSV
-  VW::parsers::csv::parser::set_parse_args(all, input_options, parsed_options.csv_opts);
+  parsed_options.csv_opts = VW::make_unique<VW::parsers::csv::parser_options>();
+  VW::parsers::csv::parser::set_parse_args(all, input_options, parsed_options.csv_opts.get());
 #endif
 #ifdef BUILD_EXTERNAL_PARSER
   VW::external::parser::set_parse_args(input_options, parsed_options);

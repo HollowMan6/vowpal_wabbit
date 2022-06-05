@@ -30,7 +30,7 @@ struct input_options
   bool chain_hash_json;
   bool flatbuffer = false;
 #ifdef BUILD_CSV
-  VW::parsers::csv::parser_options csv_opts;
+  std::unique_ptr<VW::parsers::csv::parser_options> csv_opts;
 #endif
 #ifdef BUILD_EXTERNAL_PARSER
   // pointer because it is an incomplete type
