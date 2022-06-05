@@ -11,23 +11,13 @@
 
 TEST(csv_parser_tests, test_csv_standalone_example)
 {
-  auto all = VW::initialize("--no_stdin --quiet", nullptr, false, nullptr, nullptr);
+  auto all = VW::initialize(
+      "--no_stdin --quiet --csv --csv_separator ; --csv_ns_separator . --csv_label -5,5 "
+      "--csv_remove_quotes --csv_tag -2 --csv_ns_value :5,sepal1:1.1",
+      nullptr, false, nullptr, nullptr);
   auto ae = &VW::get_unused_example(all);
 
-  // CSV parsing configurations
-  VW::parsers::csv::parser_options csv_opts = {
-      false,                                                                  // enabled
-      ";",                                                                    // csv_separator
-      ".",                                                                    // csv_ns_separator
-      "sepal1.length,sepal.width,petal.length\",petal.width,type,k,s,width",  // csv_header
-      true,                                                                   // csv_remove_quotes
-      false,                                                                  // csv_multilabels
-      "-5,5",                                                                 // csv_label
-      "-2",                                                                   // csv_tag
-      ":5,sepal1:1.1"                                                         // csv_ns_value
-  };
-
-  auto csv_parser = VW::parsers::csv::parser::get_csv_parser(all, csv_opts);
+  auto csv_parser = dynamic_cast<VW::parsers::csv::parser*>(all->custom_parser.get());
   csv_parser->parse_line(all, ae,
       "\xef\xbb\xbf\"sepal1.length\";sepal.width;\"petal.length\"\";'petal.width';\"variety1\";b;\xef\xbb\xbftype;a;k");
   csv_parser->parse_line(all, ae, "5.1;3.5;1.4;.2;1;2;1;''test';0");

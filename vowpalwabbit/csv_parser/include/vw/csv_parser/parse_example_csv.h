@@ -18,7 +18,20 @@ namespace parsers
 {
 namespace csv
 {
-struct parser_options;
+struct parser_options
+{
+  bool enabled = false;
+  // CSV parsing configurations
+  std::string csv_separator = ",";
+  std::string csv_ns_separator = "|";
+  std::string csv_header = "1";
+  bool csv_remove_quotes = false;
+  bool csv_multilabels = false;
+  std::string csv_label = "-1";
+  std::string csv_tag = "";
+  std::string csv_ns_value = "";
+};
+
 int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 
 class parser : public VW::details::input_parser
@@ -29,10 +42,10 @@ public:
   {
   }
   virtual ~parser() = default;
-  static std::unique_ptr<parser> get_csv_parser(VW::workspace* all, const parser_options& options);
+
   static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
   static void set_parse_args(
-      VW::workspace& all, VW::config::option_group_definition& in_options, parser_options& parsed_options);
+      VW::workspace& all, VW::config::option_group_definition& in_options, parser_options* parsed_options);
 
   int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);
   bool next(VW::workspace& all, io_buf& buf, VW::multi_ex& examples) override
