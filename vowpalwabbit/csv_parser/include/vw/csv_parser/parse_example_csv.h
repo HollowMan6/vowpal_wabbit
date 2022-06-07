@@ -71,15 +71,16 @@ private:
   std::vector<unsigned long> _tag_list;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
-  void parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
-  void parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line);
-  void parse_tag(VW::example* ae, std::vector<VW::string_view> csv_line);
-  void parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line);
+  void parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
+  void parse_label(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
+  void parse_tag(VW::example* ae, std::vector<std::string> csv_line);
+  void parse_namespaces(VW::workspace* all, example* ae, std::vector<std::string> csv_line);
   void parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
       VW::string_view string_feature_value, const char* ns);
-  std::vector<VW::string_view> split(VW::string_view sv, std::string ch);
+  std::vector<std::string> split(VW::string_view sv, std::string ch, bool use_quotes = false);
   void remove_quotation_marks(VW::string_view& sv);
-  bool check_if_float(VW::string_view& sv);
+  std::string remove_quotation_marks(std::string s);
+  bool check_if_float(std::string s);
   std::vector<unsigned long> list_handler(VW::string_view& sv, size_t size, const std::string& error_msg);
 };
 }  // namespace csv
