@@ -70,37 +70,11 @@ void parser::set_parse_args(
                      "one character. If no separator exists in the header cells, "
                      "then the namespace would be empty. ")
                .experimental())
-      .add(VW::config::make_option("csv_header", parsed_options->csv_header)
-               .default_value("1")
-               .help("CSV Parser: Input the feature names (and/or combined with namespaces using the "
-                     "--csv_ns_separator) separated with ','. By default, with value "
-                     "'1', CSV files are assumed to have a header with feature and/or namespaces "
-                     "names in the CSV first line. While with value '0', CSV files are assumed to "
-                     "have no header. If a string is inputted, we will auto-detect the header from "
-                     "CSV first line and get rid of it. ")
-               .experimental())
       .add(VW::config::make_option("csv_remove_quotes", parsed_options->csv_remove_quotes)
                .default_value(false)
                .help("CSV Parser: Auto remove outer quotes when they pair. "
                      "(We consider the quotes the same as any other common characters "
                      "without any special meaning)")
-               .experimental())
-      .add(VW::config::make_option("csv_multilabels", parsed_options->csv_multilabels)
-               .default_value(false)
-               .help("CSV Parser: The label type is multilabels. By default, "
-                     "we assume the multi-columns specified by --csv_label are label components")
-               .experimental())
-      .add(VW::config::make_option("csv_label", parsed_options->csv_label)
-               .default_value("-1")
-               .help("CSV Parser: Use the specified integer index as the label column number. "
-                     "The columns specified are dropped from the "
-                     "input features. Also, support specifying multi-columns in order separated "
-                     "with ',' to represent each component in the label separated by spaces. ")
-               .experimental())
-      .add(VW::config::make_option("csv_tag", parsed_options->csv_tag)
-               .default_value("")
-               .help("Use the specified integer index as the tag."
-                     "This drops it from the input features. ")
                .experimental())
       .add(VW::config::make_option("csv_ns_value", parsed_options->csv_ns_value)
                .default_value("")
@@ -121,9 +95,11 @@ void parser::reset()
 {
   _header_fn.clear();
   _header_ns.clear();
+  _header_name_to_column_num.clear();
+  _multilabels_ids.clear();
   _anon = 0;
-  _ns_value.clear();
-  _no_header = false;
+  _label_list.clear();
+  _tag_list.clear();
 }
 
 int parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
@@ -132,8 +108,8 @@ int parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
   if (_header_fn.empty()) { first_read = true; }
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
-  // Read the data if header exists.
-  if (!_no_header && first_read) { num_bytes_consumed += read_line(all, ae, buf); }
+  // Read the data if it's first read as what just read is header.
+  if (first_read) { num_bytes_consumed += read_line(all, ae, buf); }
   return static_cast<int>(num_bytes_consumed);
 }
 
@@ -167,7 +143,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
     std::vector<std::string> elements = split(csv_line, _options.csv_separator, true);
 
     // Store the ns value from CmdLine
-    if (_header_ns.empty() && !_options.csv_ns_value.empty())
+    if (_header_ns.empty() && !_options.csv_ns_value.empty() && _ns_value.empty())
     {
       std::vector<std::string> ns_values = split(_options.csv_ns_value, ",");
       for (size_t i = 0; i < ns_values.size(); i++)
@@ -187,86 +163,88 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
 
     bool this_line_is_header = false;
 
-    // Handle the label column and the tag column first.
-    if (_label_list.empty() && !_options.csv_label.empty())
-    {
-      VW::string_view csv_label(_options.csv_label);
-      _label_list = list_handler(csv_label, elements.size(), "label");
-    }
-    if (_tag_list.empty() && !_options.csv_tag.empty())
-    {
-      VW::string_view csv_tag(_options.csv_tag);
-      _tag_list = list_handler(csv_tag, elements.size(), "tag");
-      if (_tag_list.size() > 1) { THROW("Can only have one tag at most per example!"); }
-    }
-
-    // Detect the headers
+    // Handle the headers
     if (_header_fn.empty())
     {
-      _no_header = false;
-      std::vector<std::string> csv_headers_elements;
-      if (_options.csv_header.length() == 1 && _options.csv_header[0] == '0') { _no_header = true; }
-      else if (!(_options.csv_header.length() == 1 && _options.csv_header[0] == '1') && !_options.csv_header.empty())
-      {
-        csv_headers_elements = split(_options.csv_header, ",");
-      }
+      this_line_is_header = true;
 
-      if (!_no_header)
+      for (size_t i = 0; i < elements.size(); i++)
       {
-        for (size_t i = 0; i < elements.size(); i++)
+        if (_options.csv_remove_quotes) { elements[i] = remove_quotation_marks(elements[i]); }
+
+        // Handle special column names
+        if (std::find(SPECIAL_HEADERS.begin(), SPECIAL_HEADERS.end(), elements[i]) != SPECIAL_HEADERS.end())
         {
-          // Skip label and tag
-          if (!_label_list.empty() && std::find(_label_list.begin(), _label_list.end(), i) != _label_list.end() ||
-              (!_tag_list.empty() && std::find(_tag_list.begin(), _tag_list.end(), i) != _tag_list.end()))
+          _header_name_to_column_num[elements[i]] = i;
+          _header_fn.emplace_back();
+          _header_ns.emplace_back();
+          continue;
+        }
+
+        if (elements[i].rfind("_label", 0) == 0)
+        {
+          std::string number = elements[i].substr(6);
+          if (check_if_int(number))
           {
+            _multilabels_ids.push_back(std::stol(number));
+            _header_name_to_column_num[elements[i]] = i;
             _header_fn.emplace_back();
             _header_ns.emplace_back();
             continue;
           }
-
-          if (_options.csv_remove_quotes) { elements[i] = remove_quotation_marks(elements[i]); }
-
-          // when detect, column name not in the specified list, so it is not a header
-          if (!(_options.csv_header.length() == 1 && _options.csv_header[0] == '1') &&
-              std::find(csv_headers_elements.begin(), csv_headers_elements.end(), elements[i]) ==
-                  csv_headers_elements.end())
-          {
-            _no_header = true;
-            break;
-          }
-
-          // Seperate the feature name and namespace from the header.
-          std::vector<std::string> splitted = split(elements[i], _options.csv_ns_separator);
-          VW::string_view feature_name;
-          VW::string_view ns;
-          if (splitted.size() == 1) { feature_name = elements[i]; }
-          else if (splitted.size() == 2)
-          {
-            ns = splitted[0];
-            feature_name = splitted[1];
-          }
-          else
-          {
-            THROW("Malformed header for feature name and namespace separator: " << elements[i]);
-          }
-          _header_fn.emplace_back(feature_name);
-          _header_ns.emplace_back(ns);
         }
-      }
 
-      if (_no_header)
-      {
-        _header_fn.clear();
-        _header_ns.clear();
-        for (size_t i = 0; i < elements.size(); i++)
+        // Handle other column names as feature names
+        // Seperate the feature name and namespace from the header.
+        std::vector<std::string> splitted = split(elements[i], _options.csv_ns_separator);
+        VW::string_view feature_name;
+        VW::string_view ns;
+        if (splitted.size() == 1) { feature_name = elements[i]; }
+        else if (splitted.size() == 2)
         {
-          _header_fn.emplace_back();
-          _header_ns.emplace_back();
+          ns = splitted[0];
+          feature_name = splitted[1];
         }
+        else
+        {
+          THROW("Malformed header for feature name and namespace separator: " << elements[i]);
+        }
+        _header_fn.emplace_back(feature_name);
+        _header_ns.emplace_back(ns);
       }
-      else
+
+      if (!_header_name_to_column_num.empty())
       {
-        this_line_is_header = true;
+        // Handle the tag column
+        if (_header_name_to_column_num.find("_tag") != _header_name_to_column_num.end())
+        { _tag_list.push_back(_header_name_to_column_num["_tag"]); }
+
+        // Handle the label column
+        if (_header_name_to_column_num.find("_label") != _header_name_to_column_num.end())
+        {
+          _label_list.push_back(_header_name_to_column_num["_label"]);
+          // Other parts of the simple label
+          if (_multilabels_ids.empty())
+          {
+            if (_header_name_to_column_num.find("_importance") != _header_name_to_column_num.end())
+            {
+              _label_list.push_back(_header_name_to_column_num["_importance"]);
+              if (_header_name_to_column_num.find("_base") != _header_name_to_column_num.end())
+              { _label_list.push_back(_header_name_to_column_num["_base"]); }
+            }
+          }
+        }
+        // For the multilabels
+        if (!_multilabels_ids.empty())
+        {
+          std::sort(_multilabels_ids.begin(), _multilabels_ids.end());
+          for (size_t i = 0; i < _multilabels_ids.size(); i++)
+          {
+            std::stringstream ss;
+            ss << "_label" << _multilabels_ids[i];
+            _label_list.push_back(_header_name_to_column_num[ss.str()]);
+          }
+        }
       }
     }
 
@@ -296,7 +274,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<std::s
 
   std::string label_content;
   char label_part_separator = ' ';
-  if (_options.csv_multilabels) { label_part_separator = ','; }
+  if (!_multilabels_ids.empty()) { label_part_separator = ','; }
 
   for (size_t i = 0; i < _label_list.size(); i++)
   {
@@ -519,33 +497,12 @@ bool parser::check_if_float(std::string s)
   return (*ptr) == '\0';
 }
 
-std::vector<unsigned long> parser::list_handler(VW::string_view& sv, size_t size, const std::string& error_msg)
+bool parser::check_if_int(std::string s)
 {
-  std::vector<std::string> sv_list = split(sv, ",");
-  std::vector<unsigned long> list;
-  for (size_t i = 0; i < sv_list.size(); i++)
-  {
-    std::string s = sv_list[i];
-    if (s.empty()) { THROW("Empty " << error_msg << " value at " << i << "!"); }
-    char* ptr;
-    long int value = std::strtol(s.c_str(), &ptr, 0);
-    if ((*ptr) == '\0')
-    {
-      // negative numbers support the "from end of line" convention
-      // (e.g: -1 is last column, -2 is next-to-last, etc.)
-      if (value < 0) { value = size + value; }
-      if (value >= size || value < 0) { THROW(error_msg << " index out of range at " << i << ": " << value); }
-      else
-      {
-        list.push_back(value);
-      }
-    }
-    else
-    {
-      THROW("Unable to parse " << error_msg << " at " << i << "!");
-    }
-  }
-  return list;
+  if (s.empty()) { return false; }
+  char* ptr;
+  std::strtol(s.c_str(), &ptr, 0);
+  return (*ptr) == '\0';
 }
 
 }  // namespace csv

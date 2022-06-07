@@ -24,11 +24,7 @@ struct parser_options
   // CSV parsing configurations
   std::string csv_separator = ",";
   std::string csv_ns_separator = "|";
-  std::string csv_header = "1";
   bool csv_remove_quotes = false;
-  bool csv_multilabels = false;
-  std::string csv_label = "-1";
-  std::string csv_tag = "";
   std::string csv_ns_value = "";
 };
 
@@ -55,6 +51,7 @@ public:
 
   void reset();
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
+  std::vector<std::string> SPECIAL_HEADERS = {"_tag", "_label", "_importance", "_base"};
 
 protected:
   VW::io::logger logger;
@@ -62,13 +59,14 @@ protected:
 private:
   std::vector<std::string> _header_fn;
   std::vector<std::string> _header_ns;
+  std::map<std::string, size_t> _header_name_to_column_num;
+  std::vector<long int> _multilabels_ids;
   size_t _anon;
   std::map<std::string, float> _ns_value;
-  bool _no_header;
   parser_options _options;
   uint64_t _channel_hash;
-  std::vector<unsigned long> _label_list;
-  std::vector<unsigned long> _tag_list;
+  std::vector<size_t> _label_list;
+  std::vector<size_t> _tag_list;
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
@@ -81,7 +79,7 @@ private:
   void remove_quotation_marks(VW::string_view& sv);
   std::string remove_quotation_marks(std::string s);
   bool check_if_float(std::string s);
-  std::vector<unsigned long> list_handler(VW::string_view& sv, size_t size, const std::string& error_msg);
+  bool check_if_int(std::string s);
 };
 }  // namespace csv
 }  // namespace parsers
