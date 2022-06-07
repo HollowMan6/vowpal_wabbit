@@ -232,6 +232,12 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
               if (_header_name_to_column_num.find("_base") != _header_name_to_column_num.end())
               { _label_list.push_back(_header_name_to_column_num["_base"]); }
             }
+            else
+            {
+              // Other parts of the multiclass
+              if (_header_name_to_column_num.find("_weight") != _header_name_to_column_num.end())
+              { _label_list.push_back(_header_name_to_column_num["_weight"]); }
+            }
           }
         }
         // For the multilabels

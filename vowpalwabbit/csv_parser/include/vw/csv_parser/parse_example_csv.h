@@ -51,7 +51,7 @@ public:
 
   void reset();
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
-  std::vector<std::string> SPECIAL_HEADERS = {"_tag", "_label", "_importance", "_base"};
+  std::vector<std::string> SPECIAL_HEADERS = {"_tag", "_label", "_importance", "_base", "_weight"};
 
 protected:
   VW::io::logger logger;
