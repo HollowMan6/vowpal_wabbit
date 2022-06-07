@@ -164,15 +164,15 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
   if (csv_line.empty()) { THROW("Malformed CSV, empty line exists!"); }
   else
   {
-    std::vector<VW::string_view> elements = split(csv_line, _options.csv_separator);
+    std::vector<std::string> elements = split(csv_line, _options.csv_separator, true);
 
     // Store the ns value from CmdLine
     if (_header_ns.empty() && !_options.csv_ns_value.empty())
     {
-      std::vector<VW::string_view> ns_values = split(_options.csv_ns_value, ",");
+      std::vector<std::string> ns_values = split(_options.csv_ns_value, ",");
       for (size_t i = 0; i < ns_values.size(); i++)
       {
-        std::vector<VW::string_view> pair = split(ns_values[i], ":");
+        std::vector<std::string> pair = split(ns_values[i], ":");
         std::string ns = " ";
         if (pair.size() != 2 || pair[1].empty() || !check_if_float(pair[1]))
         { THROW("Malformed namespace value pair: " << ns_values[i]); }
@@ -204,7 +204,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
     if (_header_fn.empty())
     {
       _no_header = false;
-      std::vector<VW::string_view> csv_headers_elements;
+      std::vector<std::string> csv_headers_elements;
       if (_options.csv_header.length() == 1 && _options.csv_header[0] == '0') { _no_header = true; }
       else if (!(_options.csv_header.length() == 1 && _options.csv_header[0] == '1') && !_options.csv_header.empty())
       {
@@ -224,7 +224,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
             continue;
           }
 
-          if (_options.csv_remove_quotes) { remove_quotation_marks(elements[i]); }
+          if (_options.csv_remove_quotes) { elements[i] = remove_quotation_marks(elements[i]); }
 
           // when detect, column name not in the specified list, so it is not a header
           if (!(_options.csv_header.length() == 1 && _options.csv_header[0] == '1') &&
@@ -236,7 +236,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
           }
 
           // Seperate the feature name and namespace from the header.
-          std::vector<VW::string_view> splitted = split(elements[i], _options.csv_ns_separator);
+          std::vector<std::string> splitted = split(elements[i], _options.csv_ns_separator);
           VW::string_view feature_name;
           VW::string_view ns;
           if (splitted.size() == 1) { feature_name = elements[i]; }
@@ -282,7 +282,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
   }
 }
 
-void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
+void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line)
 {
   if (!_label_list.empty()) { parse_label(all, ae, csv_line); }
   if (!_tag_list.empty()) { parse_tag(ae, csv_line); }
@@ -290,7 +290,7 @@ void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<VW::
   parse_namespaces(all, ae, csv_line);
 }
 
-void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::string_view> csv_line)
+void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line)
 {
   all->example_parser->lbl_parser.default_label(ae->l);
 
@@ -320,7 +320,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<VW::st
   }
 }
 
-void parser::parse_tag(VW::example* ae, std::vector<VW::string_view> csv_line)
+void parser::parse_tag(VW::example* ae, std::vector<std::string> csv_line)
 {
   VW::string_view tag = csv_line[_tag_list[0]];
   if (_options.csv_remove_quotes) { remove_quotation_marks(tag); }
@@ -328,7 +328,7 @@ void parser::parse_tag(VW::example* ae, std::vector<VW::string_view> csv_line)
   ae->tag.insert(ae->tag.end(), tag.begin(), tag.end());
 }
 
-void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<VW::string_view> csv_line)
+void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<std::string> csv_line)
 {
   _anon = 0;
   for (size_t i = 0; i < _header_ns.size(); i++)
@@ -371,7 +371,8 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
 
   uint64_t word_hash;
   float _v;
-  bool is_feature_float = check_if_float(string_feature_value);
+  std::string feature_value = {string_feature_value.begin(), string_feature_value.end()};
+  bool is_feature_float = check_if_float(feature_value);
   if (!is_feature_float && _options.csv_remove_quotes) { remove_quotation_marks(string_feature_value); }
 
   float float_feature_value = 0.f;
@@ -422,28 +423,65 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
   }
 }
 
-std::vector<VW::string_view> parser::split(VW::string_view sv, std::string ch)
+std::vector<std::string> parser::split(VW::string_view sv, std::string ch, bool use_quotes)
 {
-  std::vector<VW::string_view> collections;
+  std::vector<std::string> collections;
   size_t pointer = 0;
   // Trim extra characters that are useless for us to read
   const char* trim_list = "\r\n\xef\xbb\xbf\f\v";
+  std::vector<size_t> unquoted_quotes_index;
+  bool inside_quotes = false;
+  char inside_quotes_symbol = '"';
 
   if (sv.empty())
   {
-    collections.emplace_back(VW::string_view());
+    collections.emplace_back();
     return collections;
   }
 
   for (size_t i = 0; i <= sv.length(); i++)
   {
-    // You can't escape the csv separator by including it inside the quotation marks
-    if (i == sv.length() || sv[i] == ch[0])
+    if (i == sv.length() && inside_quotes) { THROW("Unclosed Quote pair at end of line: " << inside_quotes_symbol); }
+    // Skip Quotes
+    else if (i < sv.length() && use_quotes && (sv[i] == '\'' || sv[i] == '"'))
+    {
+      // RFC-4180, paragraph "If double-quotes are used to enclose fields,
+      // then a double-quote appearing inside a field must be escaped by
+      // preceding it with another double quote."
+      if (i < sv.length() - 1 && sv[i] == sv[i + 1] &&
+          ((inside_quotes && sv[i] == inside_quotes_symbol) || !inside_quotes))
+      {
+        unquoted_quotes_index.push_back(i - pointer);
+        i++;
+      }
+      else if (!(inside_quotes && sv[i] != inside_quotes_symbol))
+      {
+        inside_quotes = !inside_quotes;
+        inside_quotes_symbol = sv[i];
+      }
+    }
+    else if (i == sv.length() || (sv[i] == ch[0] && !inside_quotes))
     {
       VW::string_view element(&sv[pointer], i - pointer);
       element.remove_prefix(std::min(element.find_first_not_of(trim_list), element.size()));
       element.remove_suffix(std::min(element.size() - element.find_last_not_of(trim_list) - 1, element.size()));
-      collections.emplace_back(element);
+      if (unquoted_quotes_index.empty()) { collections.emplace_back(element); }
+      else
+      {
+        // Make double escaped quotes into one
+        std::stringstream ss;
+        size_t quotes_pointer = 0;
+        unquoted_quotes_index.push_back(element.size());
+        for (size_t j = 0; j < unquoted_quotes_index.size(); j++)
+        {
+          size_t sv_size = unquoted_quotes_index[j] - quotes_pointer;
+          if (sv_size > 0 && quotes_pointer < element.size())
+          { ss << VW::string_view(&element[quotes_pointer], sv_size); }
+          quotes_pointer = unquoted_quotes_index[j] + 1;
+        }
+        collections.emplace_back(ss.str());
+      }
+      unquoted_quotes_index.clear();
       if (i < sv.length() - 1) { pointer = i + 1; }
     }
   }
@@ -465,9 +503,16 @@ void parser::remove_quotation_marks(VW::string_view& sv)
   }
 }
 
-bool parser::check_if_float(VW::string_view& sv)
+std::string parser::remove_quotation_marks(std::string s)
 {
-  std::string s = {sv.begin(), sv.end()};
+  VW::string_view sv(s);
+  remove_quotation_marks(sv);
+  std::string s_handled = {sv.begin(), sv.end()};
+  return s_handled;
+}
+
+bool parser::check_if_float(std::string s)
+{
   if (s.empty()) { return false; }
   char* ptr;
   std::strtof(s.c_str(), &ptr);
@@ -476,11 +521,11 @@ bool parser::check_if_float(VW::string_view& sv)
 
 std::vector<unsigned long> parser::list_handler(VW::string_view& sv, size_t size, const std::string& error_msg)
 {
-  std::vector<VW::string_view> sv_list = split(sv, ",");
+  std::vector<std::string> sv_list = split(sv, ",");
   std::vector<unsigned long> list;
   for (size_t i = 0; i < sv_list.size(); i++)
   {
-    std::string s = {sv_list[i].begin(), sv_list[i].end()};
+    std::string s = sv_list[i];
     if (s.empty()) { THROW("Empty " << error_msg << " value at " << i << "!"); }
     char* ptr;
     long int value = std::strtol(s.c_str(), &ptr, 0);

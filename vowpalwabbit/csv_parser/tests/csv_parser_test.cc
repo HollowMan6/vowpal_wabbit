@@ -19,15 +19,16 @@ TEST(csv_parser_tests, test_csv_standalone_example)
 
   auto csv_parser = dynamic_cast<VW::parsers::csv::parser*>(all->custom_parser.get());
   csv_parser->parse_line(all, ae,
-      "\xef\xbb\xbf\"sepal1.length\";sepal.width;\"petal.length\"\";'petal.width';\"variety1\";b;\xef\xbb\xbftype;a;k");
-  csv_parser->parse_line(all, ae, "5.1;3.5;1.4;.2;1;2;1;''test';0");
+      "\xef\xbb\xbf\"sepal1.length\";sepal.width;\"petal.length\"\"\";'petal.width';"
+      "\"variety1\";b;\xef\xbb\xbftype;a;k");
+  csv_parser->parse_line(all, ae, "5.1;3.5;1.4;.2;1;2;1;'''test;tst';0");
   VW::setup_example(*all, ae);
 
   // Check example labels and tags
   EXPECT_FLOAT_EQ(ae->l.simple.label, 1.f);
   const auto& red_features = ae->_reduction_features.template get<simple_label_reduction_features>();
   EXPECT_FLOAT_EQ(red_features.weight, 2.f);
-  EXPECT_EQ(ae->tag.size(), 4);
+  EXPECT_EQ(ae->tag.size(), 8);
 
   // Check feature numbers
   EXPECT_EQ(ae->feature_space['s'].size(), 2);
