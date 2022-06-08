@@ -423,14 +423,6 @@ bool parser::check_if_float(std::string s)
   return (*ptr) == '\0';
 }
 
-bool parser::check_if_int(std::string s)
-{
-  if (s.empty()) { return false; }
-  char* ptr;
-  std::strtol(s.c_str(), &ptr, 0);
-  return (*ptr) == '\0';
-}
-
 }  // namespace csv
 }  // namespace parsers
 }  // namespace VW
