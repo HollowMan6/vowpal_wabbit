@@ -23,9 +23,7 @@ struct parser_options
   bool enabled = false;
   // CSV parsing configurations
   std::string csv_separator = ",";
-  std::string csv_ns_separator = "|";
-  bool csv_remove_quotes = false;
-  std::string csv_ns_value = "";
+  bool csv_remove_outer_quotes = true;
 };
 
 int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
@@ -39,7 +37,6 @@ public:
   }
   virtual ~parser() = default;
 
-  static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
   static void set_parse_args(
       VW::workspace& all, VW::config::option_group_definition& in_options, parser_options* parsed_options);
 
@@ -51,7 +48,6 @@ public:
 
   void reset();
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
-  std::vector<std::string> SPECIAL_HEADERS = {"_tag", "_label", "_importance", "_base", "_weight"};
 
 protected:
   VW::io::logger logger;
@@ -60,13 +56,13 @@ private:
   std::vector<std::string> _header_fn;
   std::vector<std::string> _header_ns;
   std::map<std::string, size_t> _header_name_to_column_num;
-  std::vector<long int> _multilabels_ids;
   size_t _anon;
-  std::map<std::string, float> _ns_value;
   parser_options _options;
   uint64_t _channel_hash;
   std::vector<size_t> _label_list;
   std::vector<size_t> _tag_list;
+
+  static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);

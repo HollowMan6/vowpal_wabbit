@@ -11,17 +11,14 @@
 
 TEST(csv_parser_tests, test_csv_standalone_example)
 {
-  auto all = VW::initialize(
-      "--no_stdin --quiet --csv --csv_separator ; --csv_ns_separator . "
-      "--csv_remove_quotes --csv_ns_value :5,sepal1:1.1",
-      nullptr, false, nullptr, nullptr);
+  auto all = VW::initialize("--no_stdin --quiet --csv --csv_separator ;", nullptr, false, nullptr, nullptr);
   auto ae = &VW::get_unused_example(all);
 
   auto csv_parser = dynamic_cast<VW::parsers::csv::parser*>(all->custom_parser.get());
   csv_parser->parse_line(all, ae,
-      "\xef\xbb\xbf\"sepal1.length\";sepal.width;\"petal.length\"\"\";'petal.width';"
-      "\"_label\";_importance;\xef\xbb\xbftype;_tag;k");
-  csv_parser->parse_line(all, ae, "5.1;3.5;1.4;.2;1;2;1;'''test;tst';0");
+      "\xef\xbb\xbf\"sepal1|length\";sepal|width;\"petal|length\"\"\";petal|width;"
+      "_label;\xef\xbb\xbftype;_tag;k");
+  csv_parser->parse_line(all, ae, "5.1;3.5;1.4;.2;1 2;1;\"'test;tst\";0");
   VW::setup_example(*all, ae);
 
   // Check example labels and tags
@@ -44,11 +41,11 @@ TEST(csv_parser_tests, test_csv_standalone_example)
   EXPECT_EQ(ae->feature_space[' '].namespace_extents.size(), 1);
 
   // Check feature value
-  EXPECT_FLOAT_EQ(ae->feature_space['s'].values[0], 5.61);
+  EXPECT_FLOAT_EQ(ae->feature_space['s'].values[0], 5.1);
   EXPECT_FLOAT_EQ(ae->feature_space['s'].values[1], 3.5);
   EXPECT_FLOAT_EQ(ae->feature_space['p'].values[0], 1.4);
   EXPECT_FLOAT_EQ(ae->feature_space['p'].values[1], 0.2);
-  EXPECT_FLOAT_EQ(ae->feature_space[' '].values[0], 5);
+  EXPECT_FLOAT_EQ(ae->feature_space[' '].values[0], 1);
 
   VW::finish_example(*all, *ae);
   VW::finish(*all);
