@@ -17,8 +17,8 @@ TEST(csv_parser_tests, test_csv_standalone_example)
   auto csv_parser = dynamic_cast<VW::parsers::csv::parser*>(all->custom_parser.get());
   csv_parser->parse_line(all, ae,
       "\xef\xbb\xbf\"sepal1|length\";sepal|width;\"petal|length\"\"\";petal|width;"
-      "_label;\xef\xbb\xbftype;_tag;k");
-  csv_parser->parse_line(all, ae, "5.1;3.5;1.4;.2;1 2;1;\"'test;tst\";0");
+      "_label;type;_tag;\"k\"\xef\xbb\xbf");
+  csv_parser->parse_line(all, ae, "\f5.1;3.5;1.4;.2;1 2;1;\"'test;tst\";0\v");
   VW::setup_example(*all, ae);
 
   // Check example labels and tags

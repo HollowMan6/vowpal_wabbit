@@ -336,6 +336,9 @@ std::vector<std::string> parser::split(VW::string_view sv, std::string ch, bool 
   size_t pointer = 0;
   // Trim extra characters that are useless for us to read
   const char* trim_list = "\r\n\xef\xbb\xbf\f\v";
+  sv.remove_prefix(std::min(sv.find_first_not_of(trim_list), sv.size()));
+  sv.remove_suffix(std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size()));
+
   std::vector<size_t> unquoted_quotes_index;
   bool inside_quotes = false;
 
@@ -347,28 +350,33 @@ std::vector<std::string> parser::split(VW::string_view sv, std::string ch, bool 
 
   for (size_t i = 0; i <= sv.length(); i++)
   {
-    if (i == sv.length() && inside_quotes) { THROW("Unclosed Quote pair at end of line."); }
-    // Skip Quotes
-    else if (i < sv.length() && use_quotes && sv[i] == '"')
+    if (i == sv.length() && inside_quotes) { THROW("Unclosed quote at end of line."); }
+    // Skip Quotes at the start and end of the cell
+    else if (use_quotes && !inside_quotes && i == pointer && i < sv.length() && sv[i] == '"')
+    {
+      inside_quotes = true;
+    }
+    else if (use_quotes && inside_quotes && i < sv.length() - 1 && sv[i] == '"' && sv[i] == sv[i + 1])
     {
       // RFC-4180, paragraph "If double-quotes are used to enclose fields,
       // then a double-quote appearing inside a field must be escaped by
-      // preceding it with another double quote."
-      if (i < sv.length() - 1 && sv[i] == sv[i + 1])
-      {
-        unquoted_quotes_index.push_back(i - pointer);
-        i++;
-      }
-      else
-      {
-        inside_quotes = !inside_quotes;
-      }
+      // preceding it with another double-quote."
+      unquoted_quotes_index.push_back(i - pointer);
+      i++;
     }
-    else if (i == sv.length() || (sv[i] == ch[0] && !inside_quotes))
+    else if (use_quotes && inside_quotes &&
+        ((i < sv.length() - 1 && sv[i] == '"' && sv[i + 1] == ch[0]) || (i == sv.length() - 1 && sv[i] == '"')))
+    {
+      inside_quotes = false;
+    }
+    else if (use_quotes && inside_quotes && i < sv.length() && sv[i] == '"')
+    {
+      THROW("Unescaped quote at position " + std::to_string(i) +
+          ", double-quote appearing inside a cell must be escaped by preceding it with another double-quote!");
+    }
+    else if (i == sv.length() || (!inside_quotes && sv[i] == ch[0]))
     {
       VW::string_view element(&sv[pointer], i - pointer);
-      element.remove_prefix(std::min(element.find_first_not_of(trim_list), element.size()));
-      element.remove_suffix(std::min(element.size() - element.find_last_not_of(trim_list) - 1, element.size()));
       if (unquoted_quotes_index.empty()) { collections.emplace_back(element); }
       else
       {
