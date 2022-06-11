@@ -122,7 +122,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 
 void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line)
 {
-  if (csv_line.empty()) { THROW("Malformed CSV, empty line exists!"); }
+  if (csv_line.empty()) { ae->is_newline = true; }
   else
   {
     std::vector<std::string> elements = split(csv_line, _options.csv_separator, true);
@@ -380,6 +380,8 @@ std::vector<std::string> parser::split(VW::string_view sv, std::string ch, bool 
     else if (i == sv.length() || (!inside_quotes && sv[i] == ch[0]))
     {
       VW::string_view element(&sv[pointer], i - pointer);
+      if (i == sv.length() && sv[i - 1] == ch[0]) { element = VW::string_view(); }
+
       if (unquoted_quotes_index.empty()) { collections.emplace_back(element); }
       else
       {
