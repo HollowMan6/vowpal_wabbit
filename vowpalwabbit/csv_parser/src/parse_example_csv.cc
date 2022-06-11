@@ -278,6 +278,9 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
 
   uint64_t word_hash;
   float _v;
+  // don't add empty valued features to list of features
+  if (string_feature_value.empty()) { return; }
+
   std::string feature_value = {string_feature_value.begin(), string_feature_value.end()};
   bool is_feature_float = check_if_float(feature_value);
   if (!is_feature_float && _options.csv_remove_outer_quotes) { remove_quotation_marks(string_feature_value); }
