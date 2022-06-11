@@ -240,8 +240,12 @@ void parser::parse_tag(VW::example* ae, std::vector<std::string> csv_line)
 void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<std::string> csv_line)
 {
   _anon = 0;
+  // Mark to check if all the cells in the line is empty
+  bool empty_line = true;
   for (size_t i = 0; i < _header_ns.size(); i++)
   {
+    empty_line = empty_line && csv_line[i].empty();
+
     // Skip label and tag
     if (!_label_list.empty() && std::find(_label_list.begin(), _label_list.end(), i) != _label_list.end() ||
         (!_tag_list.empty() && std::find(_tag_list.begin(), _tag_list.end(), i) != _tag_list.end()))
@@ -269,6 +273,7 @@ void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<std::
 
     if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
   }
+  ae->is_newline = empty_line;
 }
 
 void parser::parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
