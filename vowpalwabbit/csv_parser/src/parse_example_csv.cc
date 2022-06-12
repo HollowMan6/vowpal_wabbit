@@ -45,9 +45,9 @@ void parser::handling_csv_separator(VW::workspace& all, std::string& str, const 
     if ((result != str[0] && str.length() > 2) || result == str[0])
     {
       all.logger.err_warn(
-          "Multiple characters passed as {}, only the first one will be "
+          "Multiple characters passed as {}, only the first one '{}' will be "
           "read and the rest will be ignored.",
-          name);
+          name, result);
     }
     str = result;
   }
@@ -83,6 +83,7 @@ void parser::reset()
   _header_ns.clear();
   _header_name_to_column_num.clear();
   _anon = 0;
+  _line_num = 0;
   _label_list.clear();
   _tag_list.clear();
 }
@@ -122,7 +123,16 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 
 void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line)
 {
-  if (csv_line.empty()) { ae->is_newline = true; }
+  _line_num++;
+  if (csv_line.empty())
+  {
+    if (!all->example_parser->emptylines_separate_examples)
+    { THROW("Malformed CSV, empty line at " << _line_num << "!"); }
+    else
+    {
+      ae->is_newline = true;
+    }
+  }
   else
   {
     std::vector<std::string> elements = split(csv_line, _options.csv_separator, true);
@@ -160,7 +170,7 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
         }
         else
         {
-          THROW("Malformed header for feature name and namespace separator: " << elements[i]);
+          THROW("Malformed header for feature name and namespace separator at cell " << i + 1 << ": " << elements[i]);
         }
         _header_fn.emplace_back(feature_name);
         _header_ns.emplace_back(ns);
@@ -180,8 +190,8 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
 
     if (!_header_fn.empty() && elements.size() != _header_fn.size())
     {
-      THROW(
-          "CSV line has " << elements.size() << " elements, but the header has " << _header_fn.size() << " elements!");
+      THROW("CSV line " << _line_num << " has " << elements.size() << " elements, but the header has "
+                        << _header_fn.size() << " elements!");
     }
     else if (!this_line_is_header)
     {
@@ -358,7 +368,7 @@ std::vector<std::string> parser::split(VW::string_view sv, std::string ch, bool 
 
   for (size_t i = 0; i <= sv.length(); i++)
   {
-    if (i == sv.length() && inside_quotes) { THROW("Unclosed quote at end of line."); }
+    if (i == sv.length() && inside_quotes) { THROW("Unclosed quote at end of line " << _line_num << "."); }
     // Skip Quotes at the start and end of the cell
     else if (use_quotes && !inside_quotes && i == pointer && i < sv.length() && sv[i] == '"')
     {
@@ -379,8 +389,9 @@ std::vector<std::string> parser::split(VW::string_view sv, std::string ch, bool 
     }
     else if (use_quotes && inside_quotes && i < sv.length() && sv[i] == '"')
     {
-      THROW("Unescaped quote at position " + std::to_string(i) +
-          ", double-quote appearing inside a cell must be escaped by preceding it with another double-quote!");
+      THROW("Unescaped quote at position "
+          << i + 1 << " of line " << _line_num
+          << ", double-quote appearing inside a cell must be escaped by preceding it with another double-quote!");
     }
     else if (i == sv.length() || (!inside_quotes && sv[i] == ch[0]))
     {

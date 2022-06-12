@@ -57,6 +57,7 @@ private:
   std::vector<std::string> _header_ns;
   std::map<std::string, size_t> _header_name_to_column_num;
   size_t _anon;
+  size_t _line_num = 0;
   parser_options _options;
   uint64_t _channel_hash;
   std::vector<size_t> _label_list;
