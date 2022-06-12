@@ -47,7 +47,6 @@ public:
   }
 
   void reset();
-  void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
 
 protected:
   VW::io::logger logger;
@@ -66,6 +65,7 @@ private:
   static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
 
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
+  void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
   void parse_label(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
   void parse_tag(VW::example* ae, std::vector<std::string> csv_line);
