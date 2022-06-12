@@ -13,14 +13,14 @@ TEST(csv_parser_tests, test_csv_standalone_examples)
 {
   std::string example_string =
       // Header
-      "\xef\xbb\xbf\"sepal1|length\";sepal|width;\"petal|length\"\"\";petal|width;"
-      "_label;type;_tag;\"k\";\xef\xbb\xbf\n"
+      "\xef\xbb\xbf\"sepal1|length\"\tsepal|width\t\"petal|length\"\"\"\tpetal|width\t"
+      "_label\ttype\t_tag\t\"k\"\t\xef\xbb\xbf\n"
       // Example 1
-      "\f5.1;3.5;1.4;.2;1 2;1;\"'test;tst\";0;\v\n"
+      "\f5.1\t3.5\t1.4\t.2\t1 2\t1\t\"'test\ttst\"\t0\t\v\n"
       // Example 2
-      "\f0;4.9;3.0;-1.4;\"2\";0x6E;\"te\"\"st;\";1.0;\v";
+      "\f0\t4.9\t3.0\t-1.4\t\"2\"\t0x6E\t\"te\"\"st\t\"\t1.0\t\v";
 
-  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator ;", nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\t", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
   VW::multi_ex examples;

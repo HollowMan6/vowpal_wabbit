@@ -53,8 +53,7 @@ void parser::handling_csv_separator(VW::workspace& all, std::string& str, const 
   }
 }
 
-void parser::set_parse_args(
-    VW::workspace& all, VW::config::option_group_definition& in_options, parser_options* parsed_options)
+void parser::set_parse_args(VW::config::option_group_definition& in_options, parser_options* parsed_options)
 {
   in_options
       .add(VW::config::make_option("csv", parsed_options->enabled)
@@ -65,7 +64,10 @@ void parser::set_parse_args(
                .help("CSV Parser: Specify field separator in one character, "
                      "\" | : are not allowed for reservation.")
                .experimental());
+}
 
+void parser::handle_parse_args(VW::workspace& all, parser_options* parsed_options)
+{
   if (parsed_options->enabled)
   {
     std::vector<char> csv_separator_forbid_chars = {'"', '|', ':'};
@@ -117,6 +119,11 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 
     VW::string_view csv_line(line, num_chars);
     parse_line(all, ae, csv_line);
+  }
+  // EOF is reached, reset for possible next file.
+  else
+  {
+    reset();
   }
   return num_chars_initial;
 }
@@ -213,7 +220,7 @@ void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<std::s
   all->example_parser->lbl_parser.default_label(ae->l);
 
   std::string label_content;
-  // Future: support multiple label columns
+  // Support multiple label columns
   // char label_part_separator = ' ';
   // if (!_multilabels_ids.empty()) { label_part_separator = ','; }
 

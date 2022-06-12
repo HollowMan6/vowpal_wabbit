@@ -31,25 +31,16 @@ int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 class parser : public VW::details::input_parser
 {
 public:
-  explicit parser(parser_options options, VW::io::logger logger_)
-      : VW::details::input_parser("csv"), _options(options), logger(std::move(logger_))
-  {
-  }
+  explicit parser(parser_options options) : VW::details::input_parser("csv"), _options(options) {}
   virtual ~parser() = default;
 
-  static void set_parse_args(
-      VW::workspace& all, VW::config::option_group_definition& in_options, parser_options* parsed_options);
+  static void set_parse_args(VW::config::option_group_definition& in_options, parser_options* parsed_options);
+  static void handle_parse_args(VW::workspace& all, parser_options* parsed_options);
 
-  int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);
   bool next(VW::workspace& all, io_buf& buf, VW::multi_ex& examples) override
   {
     return parse_csv(&all, examples[0], buf);
   }
-
-  void reset();
-
-protected:
-  VW::io::logger logger;
 
 private:
   std::vector<std::string> _header_fn;
@@ -64,6 +55,8 @@ private:
 
   static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
 
+  void reset();
+  int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
   void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
   void parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
