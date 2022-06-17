@@ -171,3 +171,71 @@ TEST(csv_parser_tests, test_multiple_file_examples)
   VW::finish_example(*vw, *examples[0]);
   VW::finish(*vw);
 }
+
+TEST(csv_parser_tests, test_multiclass_examples)
+{
+  std::string example_string =
+      // Header
+      "a,b,_label\n"
+      // Example 1
+      "1,here,\"1test\"\n"
+      // Example 2
+      "2,is,2test\n";
+
+  auto* vw = VW::initialize(
+      "--no_stdin --quiet -a --csv --chain_hash --named_labels 2test,1test --oaa 2", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+
+  // Check example 1 label
+  EXPECT_FLOAT_EQ(examples[0]->l.multi.label, 2);
+
+  // Check example 1 feature numbers
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 2);
+
+  // Check example 1 namespace numbers
+  EXPECT_EQ(examples[0]->feature_space[' '].namespace_extents.size(), 1);
+
+  // Check example 1 feature value
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
+
+  // Check example 1 namespace names and feature names
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].name, "a");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].name, "b");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].str_value, "here");
+
+  VW::finish_example(*vw, *examples[0]);
+  examples.clear();
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+
+  // Check example 1 label
+  EXPECT_FLOAT_EQ(examples[0]->l.multi.label, 1);
+
+  // Check example 2 feature numbers
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 2);
+
+  // Check example 2 namespace numbers
+  EXPECT_EQ(examples[0]->feature_space[' '].namespace_extents.size(), 1);
+
+  // Check example 2 feature value
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 2);
+
+  // Check example 2 namespace names and feature names
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].name, "a");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].name, "b");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].str_value, "is");
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
