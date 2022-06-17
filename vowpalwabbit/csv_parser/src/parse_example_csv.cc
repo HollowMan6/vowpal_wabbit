@@ -264,7 +264,7 @@ void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<std::
     empty_line = empty_line && csv_line[i].empty();
 
     // Skip label and tag
-    if (!_label_list.empty() && std::find(_label_list.begin(), _label_list.end(), i) != _label_list.end() ||
+    if ((!_label_list.empty() && std::find(_label_list.begin(), _label_list.end(), i) != _label_list.end()) ||
         (!_tag_list.empty() && std::find(_tag_list.begin(), _tag_list.end(), i) != _tag_list.end()))
     { continue; }
 

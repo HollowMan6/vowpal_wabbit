@@ -120,6 +120,9 @@ Input Options:
                                             keep)
     --flatbuffer                            Data file will be interpreted as a flatbuffer file (type: bool,
                                             experimental)
+    --csv                                   Data file will be interpreted as a CSV file (type: bool, experimental)
+    --csv_separator arg                     CSV Parser: Specify field separator in one character, " | : are
+                                            not allowed for reservation. (type: str, default: ,, experimental)
 Logging Options:
     --quiet                                 Don't output diagnostics and progress updates. Supplying this
                                             implies --log_level off and --driver_output_off. Supplying this
