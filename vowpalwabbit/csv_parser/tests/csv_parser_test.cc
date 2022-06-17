@@ -9,18 +9,18 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-TEST(csv_parser_tests, test_csv_standalone_examples)
+TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 {
   std::string example_string =
       // Header
       "\xef\xbb\xbf\"sepal1|length\"\tsepal|width\t\"petal|length\"\"\"\tpetal|width\t"
-      "_label\ttype\t_tag\t\"k\"\t\xef\xbb\xbf\n"
+      "_label\ttype\t_tag\t\"k\"\t\t\xef\xbb\xbf\n"
       // Example 1
-      "\f5.1\t3.5\t1.4\t.2\t1 2\t1\t\"'test\ttst\"\t0\t\v\n"
+      "\f5.1\t3.5\t1.4\t.2\t1 2\t1\t\"'te\"\"st\ttst\t\"\"\"\t0\t\t\v\n"
       // Example 2
-      "\f0\t4.9\t3.0\t-1.4\t\"2\"\t0x6E\t\"te\"\"st\t\"\t1.0\t\v";
+      "\f0\t4.9\t3.0\t-1.4\t\"2\"\t0x6E\t'te\"\"st\t1.0\t-2\t\v";
 
-  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\t", nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize("--no_stdin --quiet -a --csv --csv_separator \\t", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
   VW::multi_ex examples;
@@ -32,7 +32,9 @@ TEST(csv_parser_tests, test_csv_standalone_examples)
   EXPECT_FLOAT_EQ(examples[0]->l.simple.label, 1.f);
   const auto& red_features_exp1 = examples[0]->_reduction_features.template get<simple_label_reduction_features>();
   EXPECT_FLOAT_EQ(red_features_exp1.weight, 2.f);
-  EXPECT_EQ(examples[0]->tag.size(), 8);
+  EXPECT_EQ(examples[0]->tag.size(), 11);
+  std::string example1_tag = {examples[0]->tag.data(), examples[0]->tag.size()};
+  EXPECT_EQ(example1_tag, "te\"st\ttst\t\"");
 
   // Check example 1 feature numbers
   EXPECT_EQ(examples[0]->feature_space['s'].size(), 2);
@@ -54,6 +56,18 @@ TEST(csv_parser_tests, test_csv_standalone_examples)
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], 0.2);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
 
+  // Check example 1 namespace names and feature names
+  EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].ns, "sepal1");
+  EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].name, "length");
+  EXPECT_EQ(examples[0]->feature_space['s'].space_names[1].ns, "sepal");
+  EXPECT_EQ(examples[0]->feature_space['s'].space_names[1].name, "width");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].ns, "petal");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].name, "length\"");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[1].ns, "petal");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[1].name, "width");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].name, "type");
+
   VW::finish_example(*vw, *examples[0]);
   examples.clear();
 
@@ -65,11 +79,13 @@ TEST(csv_parser_tests, test_csv_standalone_examples)
   const auto& red_features_exp2 = examples[0]->_reduction_features.template get<simple_label_reduction_features>();
   EXPECT_FLOAT_EQ(red_features_exp2.weight, 1.f);
   EXPECT_EQ(examples[0]->tag.size(), 6);
+  std::string example2_tag = {examples[0]->tag.data(), examples[0]->tag.size()};
+  EXPECT_EQ(example2_tag, "te\"\"st");
 
   // Check example 2 feature numbers
   EXPECT_EQ(examples[0]->feature_space['s'].size(), 1);
   EXPECT_EQ(examples[0]->feature_space['p'].size(), 2);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 2);
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
   EXPECT_EQ(examples[0]->feature_space['\''].size(), 0);
   EXPECT_EQ(examples[0]->feature_space['"'].size(), 0);
   EXPECT_EQ(examples[0]->feature_space['_'].size(), 0);
@@ -85,6 +101,21 @@ TEST(csv_parser_tests, test_csv_standalone_examples)
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], -1.4);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 110);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], -2);
+
+  // Check example 1 namespace names and feature names
+  EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].ns, "sepal");
+  EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].name, "width");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].ns, "petal");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].name, "length\"");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[1].ns, "petal");
+  EXPECT_EQ(examples[0]->feature_space['p'].space_names[1].name, "width");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].name, "type");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].name, "k");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].name, "");
 
   VW::finish_example(*vw, *examples[0]);
   VW::finish(*vw);
