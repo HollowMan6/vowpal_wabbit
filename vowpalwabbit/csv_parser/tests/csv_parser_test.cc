@@ -103,7 +103,7 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], -2);
 
-  // Check example 1 namespace names and feature names
+  // Check example 2 namespace names and feature names
   EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].ns, "sepal");
   EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].name, "width");
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].ns, "petal");
@@ -117,6 +117,57 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].ns, " ");
   EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].name, "");
 
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_multiple_file_examples)
+{
+  // we specify the csv_separator to be `\a` here, and the actual csv_separator should be only `\`.
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\a", nullptr, false, nullptr, nullptr);
+  io_buf buffer;
+  VW::multi_ex examples;
+
+  // Read the first file
+  std::string file1_string =
+      // Header
+      "a\\b\\c\\_label\\_tag\n"
+      // Example
+      "1\\2\\3\\4\\a\n";
+  buffer.add_file(VW::io::create_buffer_view(file1_string.data(), file1_string.size()));
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+
+  EXPECT_FLOAT_EQ(examples[0]->l.simple.label, 4);
+  EXPECT_EQ(examples[0]->tag.size(), 1);
+  EXPECT_EQ(examples[0]->tag[0], 'a');
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 2);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], 3);
+  VW::finish_example(*vw, *examples[0]);
+
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 0);
+  examples.clear();
+
+  // Read the second file
+  std::string file2_string =
+      // Header
+      "_tag\\d\\_label\n"
+      // Example
+      "bc\\5\\6\n";
+  buffer.add_file(VW::io::create_buffer_view(file2_string.data(), file2_string.size()));
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+
+  EXPECT_FLOAT_EQ(examples[0]->l.simple.label, 6);
+  EXPECT_EQ(examples[0]->tag.size(), 2);
+  EXPECT_EQ(examples[0]->tag[0], 'b');
+  EXPECT_EQ(examples[0]->tag[1], 'c');
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 1);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 5);
   VW::finish_example(*vw, *examples[0]);
   VW::finish(*vw);
 }
