@@ -239,3 +239,117 @@ TEST(csv_parser_tests, test_multiclass_examples)
   VW::finish_example(*vw, *examples[0]);
   VW::finish(*vw);
 }
+
+TEST(csv_parser_tests, test_empty_line_error_thrown)
+{
+  std::string example_string =
+      // Header
+      "a,b,_label\n"
+      // Empty line
+      "\n";
+
+  auto* vw = VW::initialize("--no_stdin --quiet --csv", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_forbidden_csv_separator_error_thrown)
+{
+  std::vector<std::string> csv_separator_forbid_chars = {"\"", "|", ":"};
+  for (std::string csv_separator_forbid_char : csv_separator_forbid_chars)
+  {
+    EXPECT_THROW(VW::initialize("--no_stdin --quiet --csv --csv_separator " + csv_separator_forbid_char, nullptr, false,
+                     nullptr, nullptr),
+        VW::vw_exception);
+  }
+}
+
+TEST(csv_parser_tests, test_malformed_header_error_thrown)
+{
+  std::string example_string =
+      // Malformed Header
+      "a,b|c|d,_label\n"
+      "1,2,3\n";
+
+  auto* vw = VW::initialize("--no_stdin --quiet --csv", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_unmatching_element_error_thrown)
+{
+  std::string example_string =
+      // Header has 3 elements
+      "a,b,_label\n"
+      // Example 1 has 2 elements
+      "1,2\n"
+      // Example 2 has 4 elements
+      "3,4,5,6\n";
+
+  auto* vw = VW::initialize("--no_stdin --quiet --csv", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_unmatching_quotes_error_thrown)
+{
+  std::string example_string =
+      // Malformed Header
+      "abc,\"bd\"e,_label\n";
+
+  auto* vw = VW::initialize("--no_stdin --quiet --csv", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_quotes_eol_error_thrown)
+{
+  std::string example_string =
+      // Malformed Header
+      "abc,\"bd\"\"e,_label\n";
+
+  auto* vw = VW::initialize("--no_stdin --quiet --csv", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
