@@ -34,8 +34,8 @@ public:
   explicit parser(parser_options options) : VW::details::input_parser("csv"), _options(options) {}
   virtual ~parser() = default;
 
-  static void set_parse_args(VW::config::option_group_definition& in_options, parser_options* parsed_options);
-  static void handle_parse_args(VW::workspace& all, parser_options* parsed_options);
+  static void set_parse_args(VW::config::option_group_definition& in_options, parser_options& parsed_options);
+  static void handle_parse_args(parser_options& parsed_options);
 
   bool next(VW::workspace& all, io_buf& buf, VW::multi_ex& examples) override
   {
@@ -53,7 +53,7 @@ private:
   std::vector<size_t> _label_list;
   std::vector<size_t> _tag_list;
 
-  static void handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name);
+  static void handling_csv_separator(std::string& str, const std::string& name);
 
   void reset();
   int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);

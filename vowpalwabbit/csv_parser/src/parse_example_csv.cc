@@ -23,7 +23,7 @@ int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
   return keep_reading ? 1 : 0;
 }
 
-void parser::handling_csv_separator(VW::workspace& all, std::string& str, const std::string& name)
+void parser::handling_csv_separator(std::string& str, const std::string& name)
 {
   if (str.length() > 1)
   {
@@ -43,39 +43,34 @@ void parser::handling_csv_separator(VW::workspace& all, std::string& str, const 
     }
 
     if ((result != str[0] && str.length() > 2) || result == str[0])
-    {
-      all.logger.err_warn(
-          "Multiple characters passed as {}, only the first one '{}' will be "
-          "read and the rest will be ignored.",
-          name, result);
-    }
+    { THROW("Multiple characters passed as " << name << ": " << str); }
     str = result;
   }
 }
 
-void parser::set_parse_args(VW::config::option_group_definition& in_options, parser_options* parsed_options)
+void parser::set_parse_args(VW::config::option_group_definition& in_options, parser_options& parsed_options)
 {
   in_options
-      .add(VW::config::make_option("csv", parsed_options->enabled)
+      .add(VW::config::make_option("csv", parsed_options.enabled)
                .help("Data file will be interpreted as a CSV file")
                .experimental())
-      .add(VW::config::make_option("csv_separator", parsed_options->csv_separator)
+      .add(VW::config::make_option("csv_separator", parsed_options.csv_separator)
                .default_value(",")
                .help("CSV Parser: Specify field separator in one character, "
                      "\" | : are not allowed for reservation.")
                .experimental());
 }
 
-void parser::handle_parse_args(VW::workspace& all, parser_options* parsed_options)
+void parser::handle_parse_args(parser_options& parsed_options)
 {
-  if (parsed_options->enabled)
+  if (parsed_options.enabled)
   {
     std::vector<char> csv_separator_forbid_chars = {'"', '|', ':'};
 
-    handling_csv_separator(all, parsed_options->csv_separator, "CSV separator");
+    handling_csv_separator(parsed_options.csv_separator, "CSV separator");
     if (std::find(csv_separator_forbid_chars.begin(), csv_separator_forbid_chars.end(),
-            parsed_options->csv_separator[0]) != csv_separator_forbid_chars.end())
-    { THROW("Forbidden field separator used: " << parsed_options->csv_separator[0]); }
+            parsed_options.csv_separator[0]) != csv_separator_forbid_chars.end())
+    { THROW("Forbidden field separator used: " << parsed_options.csv_separator[0]); }
   }
 }
 
@@ -131,15 +126,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line)
 {
   _line_num++;
-  if (csv_line.empty())
-  {
-    if (!all->example_parser->emptylines_separate_examples)
-    { THROW("Malformed CSV, empty line at " << _line_num << "!"); }
-    else
-    {
-      ae->is_newline = true;
-    }
-  }
+  if (csv_line.empty()) { THROW("Malformed CSV, empty line at " << _line_num << "!"); }
   else
   {
     std::vector<std::string> elements = split(csv_line, _options.csv_separator, true);

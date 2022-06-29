@@ -123,8 +123,7 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 
 TEST(csv_parser_tests, test_multiple_file_examples)
 {
-  // we specify the csv_separator to be `\a` here, and the actual csv_separator should be only `\`.
-  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\a", nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   VW::multi_ex examples;
 
@@ -272,6 +271,12 @@ TEST(csv_parser_tests, test_forbidden_csv_separator_error_thrown)
   }
 }
 
+TEST(csv_parser_tests, test_multicharacter_csv_separator_error_thrown)
+{
+  EXPECT_THROW(VW::initialize("--no_stdin --quiet --csv --csv_separator \\a", nullptr, false, nullptr, nullptr),
+      VW::vw_exception);
+}
+
 TEST(csv_parser_tests, test_malformed_header_error_thrown)
 {
   std::string example_string =
@@ -351,100 +356,5 @@ TEST(csv_parser_tests, test_quotes_eol_error_thrown)
   EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
 
   VW::finish_example(*vw, *examples[0]);
-  VW::finish(*vw);
-}
-
-TEST(csv_parser_tests, test_multiline_examples)
-{
-  std::string example_string =
-      // Header
-      "_label,a,b,c,d,s_1,s_2\n"
-      // Example 1
-      "shared,1,0.5,,,,\n"
-      "0:0.1:0.75,0.5,1,2,,,\n"
-      ",1,,3,,,\n"
-      "\n"
-      // Example 2
-      "shared,,,,,1,1\n"
-      "0:1.0:0.5,1,1,1,,,\n"
-      ",0.5,2,1,,,\n"
-      ",,,,,,\n";
-
-  auto* vw = VW::initialize("--no_stdin --quiet --csv --cb_adf", nullptr, false, nullptr, nullptr);
-
-  io_buf buffer;
-  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
-  VW::multi_ex examples;
-
-  // Example 1
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->l.cb.costs.size(), 1);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 2);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 0.5);
-  VW::finish_example(*vw, *examples[0]);
-
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->l.cb.costs.size(), 1);
-  EXPECT_FLOAT_EQ(examples[0]->l.cb.costs[0].probability, 0.75);
-  EXPECT_FLOAT_EQ(examples[0]->l.cb.costs[0].cost, 0.1);
-  EXPECT_FLOAT_EQ(examples[0]->l.cb.costs[0].action, 0);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 0.5);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], 2);
-  VW::finish_example(*vw, *examples[0]);
-
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->l.cb.costs.size(), 0);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 2);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 3);
-  VW::finish_example(*vw, *examples[0]);
-
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->is_newline, true);
-  VW::finish_example(*vw, *examples[0]);
-  examples.clear();
-
-  // Example 2
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->l.cb.costs.size(), 1);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 2);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
-  VW::finish_example(*vw, *examples[0]);
-
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->l.cb.costs.size(), 1);
-  EXPECT_FLOAT_EQ(examples[0]->l.cb.costs[0].probability, 0.5);
-  EXPECT_FLOAT_EQ(examples[0]->l.cb.costs[0].cost, 1.0);
-  EXPECT_FLOAT_EQ(examples[0]->l.cb.costs[0].action, 0);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], 1);
-  VW::finish_example(*vw, *examples[0]);
-
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->l.cb.costs.size(), 0);
-  EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 0.5);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 2);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], 1);
-  VW::finish_example(*vw, *examples[0]);
-
-  examples.push_back(&VW::get_unused_example(vw));
-  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
-  EXPECT_EQ(examples[0]->is_newline, true);
-  VW::finish_example(*vw, *examples[0]);
-
   VW::finish(*vw);
 }

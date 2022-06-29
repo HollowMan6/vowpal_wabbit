@@ -410,7 +410,7 @@ input_options parse_source(VW::workspace& all, options_i& options)
                .experimental());
 #ifdef BUILD_CSV
   parsed_options.csv_opts = VW::make_unique<VW::parsers::csv::parser_options>();
-  VW::parsers::csv::parser::set_parse_args(input_options, parsed_options.csv_opts.get());
+  VW::parsers::csv::parser::set_parse_args(input_options, *parsed_options.csv_opts.get());
 #endif
 
   options.add_and_parse(input_options);
@@ -455,7 +455,7 @@ input_options parse_source(VW::workspace& all, options_i& options)
   }
 
 #ifdef BUILD_CSV
-  VW::parsers::csv::parser::handle_parse_args(all, parsed_options.csv_opts.get());
+  VW::parsers::csv::parser::handle_parse_args(*parsed_options.csv_opts.get());
 #endif
 
   return parsed_options;
