@@ -170,15 +170,16 @@ void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv
         _header_ns.emplace_back(ns);
       }
 
-      if (!_header_name_to_column_num.empty())
-      {
-        // Handle the tag column
-        if (_header_name_to_column_num.find("_tag") != _header_name_to_column_num.end())
-        { _tag_list.push_back(_header_name_to_column_num["_tag"]); }
+      // Handle the tag column
+      if (_header_name_to_column_num.find("_tag") != _header_name_to_column_num.end())
+      { _tag_list.push_back(_header_name_to_column_num["_tag"]); }
 
-        // Handle the label column
-        if (_header_name_to_column_num.find("_label") != _header_name_to_column_num.end())
-        { _label_list.push_back(_header_name_to_column_num["_label"]); }
+      // Handle the label column
+      if (_header_name_to_column_num.find("_label") != _header_name_to_column_num.end())
+      { _label_list.push_back(_header_name_to_column_num["_label"]); }
+      else
+      {
+        all->logger.err_warn("No '_label' column found in the CSV file, please ensure header exits in the first line!");
       }
     }
 

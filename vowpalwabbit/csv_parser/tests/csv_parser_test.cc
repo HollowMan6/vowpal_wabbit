@@ -239,6 +239,28 @@ TEST(csv_parser_tests, test_multiclass_examples)
   VW::finish(*vw);
 }
 
+TEST(csv_parser_tests, test_empty_header_and_example_line)
+{
+  std::string example_string =
+      // Header
+      ",,,\n"
+      // New line
+      ",,,\n";
+
+  auto* vw = VW::initialize("--no_stdin --quiet --csv", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+  EXPECT_EQ(examples[0]->is_newline, true);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
 TEST(csv_parser_tests, test_empty_line_error_thrown)
 {
   std::string example_string =
