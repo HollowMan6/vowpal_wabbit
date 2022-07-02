@@ -292,17 +292,23 @@ void parser::parse_features(VW::workspace* all, features& fs, VW::string_view fe
   if (string_feature_value.empty()) { return; }
 
   std::string feature_value = {string_feature_value.begin(), string_feature_value.end()};
-  bool is_feature_float = check_if_float(feature_value);
+  bool is_feature_float;
+  float parsed_feature_value = 0.f;
+  if (feature_value.empty()) { is_feature_float = false; }
+  else
+  {
+    size_t end_read = 0;
+    parsed_feature_value = parseFloat(feature_value.data(), end_read, feature_value.data() + feature_value.size());
+    is_feature_float = (end_read == feature_value.size());
+    if (std::isnan(parsed_feature_value))
+    {
+      parsed_feature_value = 0.f;
+      is_feature_float = false;
+    }
+  }
   if (!is_feature_float && _options.csv_remove_outer_quotes) { remove_quotation_marks(string_feature_value); }
 
-  float float_feature_value = 0.f;
-
-  if (is_feature_float)
-  {
-    size_t end_idx = string_feature_value.length();
-    float_feature_value = parseFloat(string_feature_value.data(), end_idx);
-    _v = _cur_channel_v * float_feature_value;
-  }
+  if (is_feature_float) { _v = _cur_channel_v * parsed_feature_value; }
   else
   {
     _v = 1;
@@ -437,14 +443,6 @@ std::string parser::remove_quotation_marks(std::string s)
   remove_quotation_marks(sv);
   std::string s_handled = {sv.begin(), sv.end()};
   return s_handled;
-}
-
-bool parser::check_if_float(std::string s)
-{
-  if (s.empty()) { return false; }
-  char* ptr;
-  std::strtof(s.c_str(), &ptr);
-  return (*ptr) == '\0';
 }
 
 }  // namespace csv

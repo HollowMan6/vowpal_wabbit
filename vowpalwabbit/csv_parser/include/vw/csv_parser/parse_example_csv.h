@@ -68,7 +68,6 @@ private:
   std::vector<std::string> split(VW::string_view sv, std::string ch, bool use_quotes = false);
   void remove_quotation_marks(VW::string_view& sv);
   std::string remove_quotation_marks(std::string s);
-  bool check_if_float(std::string s);
 };
 }  // namespace csv
 }  // namespace parsers
