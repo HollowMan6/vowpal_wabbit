@@ -15,15 +15,13 @@ namespace VW
 {
 namespace parsers
 {
-namespace csv
-{
-int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
+int parse_csv_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples)
 {
   bool keep_reading = all->custom_parser->next(*all, buf, examples);
   return keep_reading ? 1 : 0;
 }
 
-void parser::handling_csv_separator(std::string& str, const std::string& name)
+void csv_parser::handling_csv_separator(std::string& str, const std::string& name)
 {
   if (str.length() > 1)
   {
@@ -48,7 +46,7 @@ void parser::handling_csv_separator(std::string& str, const std::string& name)
   }
 }
 
-void parser::set_parse_args(VW::config::option_group_definition& in_options, parser_options& parsed_options)
+void csv_parser::set_parse_args(VW::config::option_group_definition& in_options, csv_parser_options& parsed_options)
 {
   in_options
       .add(VW::config::make_option("csv", parsed_options.enabled)
@@ -61,31 +59,369 @@ void parser::set_parse_args(VW::config::option_group_definition& in_options, par
                .experimental());
 }
 
-void parser::handle_parse_args(parser_options& parsed_options)
+void csv_parser::handle_parse_args(csv_parser_options& parsed_options)
 {
   if (parsed_options.enabled)
   {
-    std::vector<char> csv_separator_forbid_chars = {'"', '|', ':'};
+    const char* csv_separator_forbid_chars = "\"|:";
 
     handling_csv_separator(parsed_options.csv_separator, "CSV separator");
-    if (std::find(csv_separator_forbid_chars.begin(), csv_separator_forbid_chars.end(),
-            parsed_options.csv_separator[0]) != csv_separator_forbid_chars.end())
-    { THROW("Forbidden field separator used: " << parsed_options.csv_separator[0]); }
+    for (size_t i = 0; i < strlen(csv_separator_forbid_chars); i++)
+    {
+      if (parsed_options.csv_separator[0] == csv_separator_forbid_chars[i])
+      { THROW("Forbidden field separator used: " << parsed_options.csv_separator[0]); }
+    }
   }
 }
 
-void parser::reset()
+class CSV_parser
+{
+public:
+  CSV_parser(VW::workspace& all, VW::example* ae, VW::string_view line, VW::parsers::csv_parser* parser)
+      : _p(all.example_parser)
+      , _sd(all.sd)
+      , _hash_seed(all.hash_seed)
+      , _parse_mask(all.parse_mask)
+      , _parser(parser)
+      , ae(ae)
+      , logger(&all.logger)
+      , csv_separator(parser->_options.csv_separator[0])
+      , csv_remove_outer_quotes(parser->_options.csv_remove_outer_quotes)
+  {
+    _parser->_line_num++;
+    audit = (all.audit || all.hash_inv);
+    if (line.empty()) { THROW("Malformed CSV, empty line at " << _parser->_line_num << "!"); }
+    else
+    {
+      csv_line = split(line, csv_separator, true);
+      parse_line();
+    }
+  }
+  ~CSV_parser() {}
+
+private:
+  size_t _anon = 0;
+  uint64_t _channel_hash;
+  parser* _p;
+  shared_data* _sd;
+  uint32_t _hash_seed;
+  uint64_t _parse_mask;
+  VW::parsers::csv_parser* _parser;
+  VW::example* ae;
+  VW::io::logger* logger;
+  std::vector<VW::string_view> csv_line;
+  const char csv_separator;
+  const bool csv_remove_outer_quotes;
+  bool audit;
+  std::vector<std::string> token_storage;
+
+  inline FORCE_INLINE void parse_line()
+  {
+    bool this_line_is_header = false;
+
+    // Handle the headers
+    if (_parser->_header_fn.empty())
+    {
+      this_line_is_header = true;
+
+      for (size_t i = 0; i < csv_line.size(); i++)
+      {
+        if (csv_remove_outer_quotes) { remove_quotation_marks(csv_line[i]); }
+
+        // Handle special column names
+        if (csv_line[i] == "_tag" || csv_line[i] == "_label")
+        {
+          // Handle the tag column
+          if (csv_line[i] == "_tag") { _parser->_tag_list.emplace_back(i); }
+          // Handle the label column
+          else if (csv_line[i] == "_label")
+          {
+            _parser->_label_list.emplace_back(i);
+          }
+
+          _parser->_header_fn.emplace_back();
+          _parser->_header_ns.emplace_back();
+          continue;
+        }
+
+        // Handle other column names as feature names
+        // Seperate the feature name and namespace from the header.
+        std::vector<VW::string_view> splitted = split(csv_line[i], '|');
+        VW::string_view feature_name;
+        VW::string_view ns;
+        if (splitted.size() == 1) { feature_name = csv_line[i]; }
+        else if (splitted.size() == 2)
+        {
+          ns = splitted[0];
+          feature_name = splitted[1];
+        }
+        else
+        {
+          THROW("Malformed header for feature name and namespace separator at cell " << i + 1 << ": " << csv_line[i]);
+        }
+        _parser->_header_fn.emplace_back(feature_name);
+        _parser->_header_ns.emplace_back(ns);
+        _parser->_feature_list[std::string{ns}].emplace_back(i);
+      }
+
+      if (_parser->_label_list.empty())
+      { logger->err_warn("No '_label' column found in the CSV file, please ensure header exits in the first line!"); }
+    }
+
+    if (csv_line.size() != _parser->_header_fn.size())
+    {
+      THROW("CSV line " << _parser->_line_num << " has " << csv_line.size() << " elements, but the header has "
+                        << _parser->_header_fn.size() << " elements!");
+    }
+    else if (!this_line_is_header)
+    {
+      parse_example();
+    }
+  }
+
+  inline FORCE_INLINE void parse_example()
+  {
+    if (!_parser->_label_list.empty()) { parse_label(); }
+    if (!_parser->_tag_list.empty()) { parse_tag(); }
+
+    parse_namespaces();
+  }
+
+  inline FORCE_INLINE void parse_label()
+  {
+    _p->lbl_parser.default_label(ae->l);
+
+    VW::string_view label_content = csv_line[_parser->_label_list[0]];
+    if (csv_remove_outer_quotes) { remove_quotation_marks(label_content); }
+
+    _p->words.clear();
+    VW::tokenize(' ', label_content, _p->words);
+
+    if (!_p->words.empty())
+    {
+      _p->lbl_parser.parse_label(
+          ae->l, ae->_reduction_features, _p->parser_memory_to_reuse, _sd->ldict.get(), _p->words, *logger);
+    }
+  }
+
+  inline FORCE_INLINE void parse_tag()
+  {
+    VW::string_view tag = csv_line[_parser->_tag_list[0]];
+    if (csv_remove_outer_quotes) { remove_quotation_marks(tag); }
+    if (!tag.empty() && tag.front() == '\'') { tag.remove_prefix(1); }
+    ae->tag.insert(ae->tag.end(), tag.begin(), tag.end());
+  }
+
+  inline FORCE_INLINE void parse_namespaces()
+  {
+    // Mark to check if all the cells in the line is empty
+    bool empty_line = true;
+    for (auto& f : _parser->_feature_list)
+    {
+      VW::string_view ns;
+      bool new_index = false;
+      if (f.first.empty())
+      {
+        ns = " ";
+        _channel_hash = _hash_seed == 0 ? 0 : VW::uniform_hash("", 0, _hash_seed);
+      }
+      else
+      {
+        ns = f.first;
+        _channel_hash = _p->hasher(ns.data(), ns.length(), _hash_seed);
+      }
+
+      unsigned char _index = static_cast<unsigned char>(ns[0]);
+      if (ae->feature_space[_index].size() == 0) { new_index = true; }
+
+      ae->feature_space[_index].start_ns_extent(_channel_hash);
+
+      for (size_t i = 0; i < f.second.size(); i++)
+      {
+        size_t column_index = f.second[i];
+        empty_line = empty_line && csv_line[column_index].empty();
+        parse_features(ae->feature_space[_index], _parser->_header_fn[column_index], csv_line[column_index], ns);
+      }
+
+      ae->feature_space[_index].end_ns_extent();
+      if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.emplace_back(_index); }
+    }
+    ae->is_newline = empty_line;
+  }
+
+  inline FORCE_INLINE void parse_features(
+      features& fs, VW::string_view feature_name, VW::string_view string_feature_value, VW::string_view ns)
+  {
+    float _cur_channel_v = 1.f;
+
+    uint64_t word_hash;
+    float _v;
+    // don't add empty valued features to list of features
+    if (string_feature_value.empty()) { return; }
+
+    bool is_feature_float = false;
+    float parsed_feature_value = 0.f;
+
+    if (string_feature_value[0] != '"')
+    {
+      size_t end_read = 0;
+      parsed_feature_value =
+          parseFloat(string_feature_value.data(), end_read, string_feature_value.data() + string_feature_value.size());
+      is_feature_float = (end_read == string_feature_value.size());
+      if (std::isnan(parsed_feature_value))
+      {
+        logger->err_warn("NaN value at CSV line {} for feature {} with namespace {} and value {}", _parser->_line_num,
+            feature_name, ns, string_feature_value);
+        is_feature_float = false;
+      }
+    }
+
+    if (!is_feature_float && csv_remove_outer_quotes) { remove_quotation_marks(string_feature_value); }
+
+    if (is_feature_float) { _v = _cur_channel_v * parsed_feature_value; }
+    else
+    {
+      _v = 1;
+    }
+
+    // Case where feature value is string
+    if (!is_feature_float)
+    {
+      // chain hash is hash(feature_value, hash(feature_name, namespace_hash)) & parse_mask
+      word_hash = (_p->hasher(string_feature_value.data(), string_feature_value.length(),
+                       _p->hasher(feature_name.data(), feature_name.length(), _channel_hash)) &
+          _parse_mask);
+    }
+    // Case where feature value is float and feature name is not empty
+    else if (!feature_name.empty())
+    {
+      word_hash = (_p->hasher(feature_name.data(), feature_name.length(), _channel_hash) & _parse_mask);
+    }
+    // Case where feature value is float and feature name is empty
+    else
+    {
+      word_hash = _channel_hash + _anon++;
+    }
+
+    // don't add 0 valued features to list of features
+    if (_v == 0) { return; }
+    fs.push_back(_v, word_hash);
+
+    if (audit)
+    {
+      if (!is_feature_float)
+      {
+        fs.space_names.emplace_back(
+            VW::audit_strings(std::string{ns}, std::string{feature_name}, std::string{string_feature_value}));
+      }
+      else
+      {
+        fs.space_names.emplace_back(VW::audit_strings(std::string{ns}, std::string{feature_name}));
+      }
+    }
+  }
+
+  inline FORCE_INLINE std::vector<VW::string_view> split(VW::string_view sv, const char ch, bool use_quotes = false)
+  {
+    std::vector<VW::string_view> collections;
+    size_t pointer = 0;
+    // Trim extra characters that are useless for us to read
+    const char* trim_list = "\r\n\xef\xbb\xbf\f\v";
+    sv.remove_prefix(std::min(sv.find_first_not_of(trim_list), sv.size()));
+    sv.remove_suffix(std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size()));
+
+    VW::v_array<size_t> unquoted_quotes_index;
+    bool inside_quotes = false;
+
+    if (sv.empty())
+    {
+      collections.emplace_back();
+      return collections;
+    }
+
+    for (size_t i = 0; i <= sv.length(); i++)
+    {
+      if (i == sv.length() && inside_quotes) { THROW("Unclosed quote at end of line " << _parser->_line_num << "."); }
+      // Skip Quotes at the start and end of the cell
+      else if (use_quotes && !inside_quotes && i == pointer && i < sv.length() && sv[i] == '"')
+      {
+        inside_quotes = true;
+      }
+      else if (use_quotes && inside_quotes && i < sv.length() - 1 && sv[i] == '"' && sv[i] == sv[i + 1])
+      {
+        // RFC-4180, paragraph "If double-quotes are used to enclose fields,
+        // then a double-quote appearing inside a field must be escaped by
+        // preceding it with another double-quote."
+        unquoted_quotes_index.emplace_back(i - pointer);
+        i++;
+      }
+      else if (use_quotes && inside_quotes &&
+          ((i < sv.length() - 1 && sv[i] == '"' && sv[i + 1] == ch) || (i == sv.length() - 1 && sv[i] == '"')))
+      {
+        inside_quotes = false;
+      }
+      else if (use_quotes && inside_quotes && i < sv.length() && sv[i] == '"')
+      {
+        THROW("Unescaped quote at position "
+            << i + 1 << " of line " << _parser->_line_num
+            << ", double-quote appearing inside a cell must be escaped by preceding it with another double-quote!");
+      }
+      else if (i == sv.length() || (!inside_quotes && sv[i] == ch))
+      {
+        VW::string_view element(&sv[pointer], i - pointer);
+        if (i == sv.length() && sv[i - 1] == ch) { element = VW::string_view(); }
+
+        if (unquoted_quotes_index.empty()) { collections.emplace_back(element); }
+        else
+        {
+          // Make double escaped quotes into one
+          std::string new_string;
+          size_t quotes_pointer = 0;
+          unquoted_quotes_index.emplace_back(element.size());
+          for (size_t j = 0; j < unquoted_quotes_index.size(); j++)
+          {
+            size_t sv_size = unquoted_quotes_index[j] - quotes_pointer;
+            if (sv_size > 0 && quotes_pointer < element.size())
+            {
+              VW::string_view str_part(&element[quotes_pointer], sv_size);
+              new_string += {str_part.begin(), str_part.end()};
+            }
+            quotes_pointer = unquoted_quotes_index[j] + 1;
+          }
+          // This is a bit of a hack to expand string lifetime.
+          token_storage.emplace_back(new_string);
+          collections.emplace_back(token_storage[token_storage.size() - 1]);
+        }
+        unquoted_quotes_index.clear();
+        if (i < sv.length() - 1) { pointer = i + 1; }
+      }
+    }
+    return collections;
+  }
+
+  inline FORCE_INLINE void remove_quotation_marks(VW::string_view& sv)
+  {
+    // When the outer quotes pair, we just remove them.
+    // If they don't, we just keep them without throwing any errors.
+    if (sv.size() > 1 && sv[0] == '"' && sv[0] == sv[sv.size() - 1])
+    {
+      sv.remove_prefix(1);
+      sv.remove_suffix(1);
+    }
+  }
+};
+
+void csv_parser::reset()
 {
   _header_fn.clear();
   _header_ns.clear();
-  _anon = 0;
   _line_num = 0;
   _label_list.clear();
   _tag_list.clear();
   _feature_list.clear();
 }
 
-int parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
+int csv_parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
 {
   bool first_read = false;
   if (_header_fn.empty()) { first_read = true; }
@@ -96,7 +432,7 @@ int parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
   return static_cast<int>(num_bytes_consumed);
 }
 
-size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
+size_t csv_parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
 {
   char* line = nullptr;
   size_t num_chars_initial = buf.readto(line, '\n');
@@ -113,7 +449,7 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
     if (num_chars > 0 && line[num_chars - 1] == '\r') { num_chars--; }
 
     VW::string_view csv_line(line, num_chars);
-    parse_line(all, ae, csv_line);
+    CSV_parser parse_line(*all, ae, csv_line, this);
   }
   // EOF is reached, reset for possible next file.
   else
@@ -122,332 +458,5 @@ size_t parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
   }
   return num_chars_initial;
 }
-
-void parser::parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line)
-{
-  _line_num++;
-  if (csv_line.empty()) { THROW("Malformed CSV, empty line at " << _line_num << "!"); }
-  else
-  {
-    std::vector<std::string> elements = split(csv_line, _options.csv_separator[0], true);
-
-    bool this_line_is_header = false;
-
-    // Handle the headers
-    if (_header_fn.empty())
-    {
-      this_line_is_header = true;
-
-      for (size_t i = 0; i < elements.size(); i++)
-      {
-        if (_options.csv_remove_outer_quotes) { elements[i] = remove_quotation_marks(elements[i]); }
-
-        // Handle special column names
-        if (elements[i] == "_tag" || elements[i] == "_label")
-        {
-          // Handle the tag column
-          if (elements[i] == "_tag") { _tag_list.push_back(i); }
-          // Handle the label column
-          else if (elements[i] == "_label")
-          {
-            _label_list.push_back(i);
-          }
-
-          _header_fn.emplace_back();
-          _header_ns.emplace_back();
-          continue;
-        }
-        else
-        {
-          _feature_list.push_back(i);
-        }
-
-        // Handle other column names as feature names
-        // Seperate the feature name and namespace from the header.
-        std::vector<std::string> splitted = split(elements[i], '|');
-        VW::string_view feature_name;
-        VW::string_view ns;
-        if (splitted.size() == 1) { feature_name = elements[i]; }
-        else if (splitted.size() == 2)
-        {
-          ns = splitted[0];
-          feature_name = splitted[1];
-        }
-        else
-        {
-          THROW("Malformed header for feature name and namespace separator at cell " << i + 1 << ": " << elements[i]);
-        }
-        _header_fn.emplace_back(feature_name);
-        _header_ns.emplace_back(ns);
-      }
-
-      if (_label_list.empty())
-      {
-        all->logger.err_warn("No '_label' column found in the CSV file, please ensure header exits in the first line!");
-      }
-    }
-
-    if (!_header_fn.empty() && elements.size() != _header_fn.size())
-    {
-      THROW("CSV line " << _line_num << " has " << elements.size() << " elements, but the header has "
-                        << _header_fn.size() << " elements!");
-    }
-    else if (!this_line_is_header)
-    {
-      parse_example(all, ae, elements);
-    }
-  }
-}
-
-void parser::parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line)
-{
-  if (!_label_list.empty()) { parse_label(all, ae, csv_line); }
-  if (!_tag_list.empty()) { parse_tag(ae, csv_line); }
-
-  parse_namespaces(all, ae, csv_line);
-}
-
-void parser::parse_label(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line)
-{
-  all->example_parser->lbl_parser.default_label(ae->l);
-
-  std::string label_content;
-  // Support multiple label columns
-  // char label_part_separator = ' ';
-  // if (!_multilabels_ids.empty()) { label_part_separator = ','; }
-
-  for (size_t i = 0; i < _label_list.size(); i++)
-  {
-    VW::string_view label_content_part(csv_line[_label_list[i]]);
-    if (_options.csv_remove_outer_quotes) { remove_quotation_marks(label_content_part); }
-    // Skip the empty cells
-    if (label_content_part.empty()) { continue; }
-    label_content += {label_content_part.begin(), label_content_part.end()};
-    // label_content += label_part_separator;
-  }
-
-  // if (!label_content.empty() && label_content.back() == label_part_separator) { label_content.pop_back(); }
-
-  all->example_parser->words.clear();
-  VW::tokenize(' ', label_content, all->example_parser->words);
-
-  if (!all->example_parser->words.empty())
-  {
-    all->example_parser->lbl_parser.parse_label(ae->l, ae->_reduction_features,
-        all->example_parser->parser_memory_to_reuse, all->sd->ldict.get(), all->example_parser->words, all->logger);
-  }
-}
-
-void parser::parse_tag(VW::example* ae, std::vector<std::string> csv_line)
-{
-  VW::string_view tag = csv_line[_tag_list[0]];
-  if (_options.csv_remove_outer_quotes) { remove_quotation_marks(tag); }
-  if (!tag.empty() && tag.front() == '\'') { tag.remove_prefix(1); }
-  ae->tag.insert(ae->tag.end(), tag.begin(), tag.end());
-}
-
-void parser::parse_namespaces(VW::workspace* all, example* ae, std::vector<std::string> csv_line)
-{
-  _anon = 0;
-  // Mark to check if all the cells in the line is empty
-  bool empty_line = true;
-  for (size_t i = 0; i < _feature_list.size(); i++)
-  {
-    size_t column_index = _feature_list[i];
-    empty_line = empty_line && csv_line[column_index].empty();
-
-    std::string ns;
-    bool new_index = false;
-    if (_header_ns[column_index].empty())
-    {
-      ns = " ";
-      _channel_hash = all->hash_seed == 0 ? 0 : VW::uniform_hash("", 0, all->hash_seed);
-    }
-    else
-    {
-      ns = {_header_ns[column_index].begin(), _header_ns[column_index].end()};
-      _channel_hash = all->example_parser->hasher(ns.data(), ns.length(), all->hash_seed);
-    }
-
-    unsigned char _index = static_cast<unsigned char>(ns[0]);
-    if (ae->feature_space[_index].size() == 0) { new_index = true; }
-
-    ae->feature_space[_index].start_ns_extent(_channel_hash);
-    parse_features(all, ae->feature_space[_index], _header_fn[column_index], csv_line[column_index], ns.c_str());
-    ae->feature_space[_index].end_ns_extent();
-
-    if (new_index && ae->feature_space[_index].size() > 0) { ae->indices.push_back(_index); }
-  }
-  ae->is_newline = empty_line;
-}
-
-void parser::parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
-    VW::string_view string_feature_value, const char* ns)
-{
-  float _cur_channel_v = 1.f;
-
-  uint64_t word_hash;
-  float _v;
-  // don't add empty valued features to list of features
-  if (string_feature_value.empty()) { return; }
-
-  std::string feature_value = {string_feature_value.begin(), string_feature_value.end()};
-  bool is_feature_float;
-  float parsed_feature_value = 0.f;
-  if (feature_value.empty()) { is_feature_float = false; }
-  else
-  {
-    size_t end_read = 0;
-    parsed_feature_value = parseFloat(feature_value.data(), end_read, feature_value.data() + feature_value.size());
-    is_feature_float = (end_read == feature_value.size());
-    if (std::isnan(parsed_feature_value))
-    {
-      parsed_feature_value = 0.f;
-      is_feature_float = false;
-    }
-  }
-  if (!is_feature_float && _options.csv_remove_outer_quotes) { remove_quotation_marks(string_feature_value); }
-
-  if (is_feature_float) { _v = _cur_channel_v * parsed_feature_value; }
-  else
-  {
-    _v = 1;
-  }
-
-  // Case where feature value is string
-  if (!is_feature_float)
-  {
-    // chain hash is hash(feature_value, hash(feature_name, namespace_hash)) & parse_mask
-    word_hash = (all->example_parser->hasher(string_feature_value.data(), string_feature_value.length(),
-                     all->example_parser->hasher(feature_name.data(), feature_name.length(), _channel_hash)) &
-        all->parse_mask);
-  }
-  // Case where feature value is float and feature name is not empty
-  else if (!feature_name.empty())
-  {
-    word_hash =
-        (all->example_parser->hasher(feature_name.data(), feature_name.length(), _channel_hash) & all->parse_mask);
-  }
-  // Case where feature value is float and feature name is empty
-  else
-  {
-    word_hash = _channel_hash + _anon++;
-  }
-
-  // don't add 0 valued features to list of features
-  if (_v == 0) { return; }
-  fs.push_back(_v, word_hash);
-
-  if ((all->audit || all->hash_inv) && ns != nullptr)
-  {
-    if (!is_feature_float)
-    { fs.space_names.push_back(VW::audit_strings(ns, std::string{feature_name}, std::string{string_feature_value})); }
-    else
-    {
-      fs.space_names.push_back(VW::audit_strings(ns, std::string{feature_name}));
-    }
-  }
-}
-
-std::vector<std::string> parser::split(VW::string_view sv, const char ch, bool use_quotes)
-{
-  std::vector<std::string> collections;
-  size_t pointer = 0;
-  // Trim extra characters that are useless for us to read
-  const char* trim_list = "\r\n\xef\xbb\xbf\f\v";
-  sv.remove_prefix(std::min(sv.find_first_not_of(trim_list), sv.size()));
-  sv.remove_suffix(std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size()));
-
-  std::vector<size_t> unquoted_quotes_index;
-  bool inside_quotes = false;
-
-  if (sv.empty())
-  {
-    collections.emplace_back();
-    return collections;
-  }
-
-  for (size_t i = 0; i <= sv.length(); i++)
-  {
-    if (i == sv.length() && inside_quotes) { THROW("Unclosed quote at end of line " << _line_num << "."); }
-    // Skip Quotes at the start and end of the cell
-    else if (use_quotes && !inside_quotes && i == pointer && i < sv.length() && sv[i] == '"')
-    {
-      inside_quotes = true;
-    }
-    else if (use_quotes && inside_quotes && i < sv.length() - 1 && sv[i] == '"' && sv[i] == sv[i + 1])
-    {
-      // RFC-4180, paragraph "If double-quotes are used to enclose fields,
-      // then a double-quote appearing inside a field must be escaped by
-      // preceding it with another double-quote."
-      unquoted_quotes_index.push_back(i - pointer);
-      i++;
-    }
-    else if (use_quotes && inside_quotes &&
-        ((i < sv.length() - 1 && sv[i] == '"' && sv[i + 1] == ch) || (i == sv.length() - 1 && sv[i] == '"')))
-    {
-      inside_quotes = false;
-    }
-    else if (use_quotes && inside_quotes && i < sv.length() && sv[i] == '"')
-    {
-      THROW("Unescaped quote at position "
-          << i + 1 << " of line " << _line_num
-          << ", double-quote appearing inside a cell must be escaped by preceding it with another double-quote!");
-    }
-    else if (i == sv.length() || (!inside_quotes && sv[i] == ch))
-    {
-      VW::string_view element(&sv[pointer], i - pointer);
-      if (i == sv.length() && sv[i - 1] == ch) { element = VW::string_view(); }
-
-      if (unquoted_quotes_index.empty()) { collections.emplace_back(element); }
-      else
-      {
-        // Make double escaped quotes into one
-        std::string new_string;
-        size_t quotes_pointer = 0;
-        unquoted_quotes_index.push_back(element.size());
-        for (size_t j = 0; j < unquoted_quotes_index.size(); j++)
-        {
-          size_t sv_size = unquoted_quotes_index[j] - quotes_pointer;
-          if (sv_size > 0 && quotes_pointer < element.size())
-          {
-            VW::string_view str_part(&element[quotes_pointer], sv_size);
-            new_string += {str_part.begin(), str_part.end()};
-          }
-          quotes_pointer = unquoted_quotes_index[j] + 1;
-        }
-        collections.emplace_back(new_string);
-      }
-      unquoted_quotes_index.clear();
-      if (i < sv.length() - 1) { pointer = i + 1; }
-    }
-  }
-  return collections;
-}
-
-void parser::remove_quotation_marks(VW::string_view& sv)
-{
-  const char* trim_list = "\"";
-  size_t prefix_pos = std::min(sv.find_first_not_of(trim_list), sv.size());
-  size_t suffix_pos = std::min(sv.size() - sv.find_last_not_of(trim_list) - 1, sv.size());
-
-  // When the outer quotes pair, we just remove them.
-  // If they don't, we just keep them without throwing any errors.
-  if (sv.size() > 1 && prefix_pos > 0 && suffix_pos > 0 && sv[0] == sv[sv.size() - 1])
-  {
-    sv.remove_prefix(1);
-    sv.remove_suffix(1);
-  }
-}
-
-std::string parser::remove_quotation_marks(std::string s)
-{
-  VW::string_view sv(s);
-  remove_quotation_marks(sv);
-  std::string s_handled = {sv.begin(), sv.end()};
-  return s_handled;
-}
-
-}  // namespace csv
 }  // namespace parsers
 }  // namespace VW

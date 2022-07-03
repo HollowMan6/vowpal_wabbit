@@ -16,9 +16,7 @@ namespace VW
 {
 namespace parsers
 {
-namespace csv
-{
-struct parser_options
+struct csv_parser_options
 {
   bool enabled = false;
   // CSV parsing configurations
@@ -26,49 +24,35 @@ struct parser_options
   bool csv_remove_outer_quotes = true;
 };
 
-int parse_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
+int parse_csv_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 
-class parser : public VW::details::input_parser
+class csv_parser : public VW::details::input_parser
 {
 public:
-  explicit parser(parser_options options) : VW::details::input_parser("csv"), _options(options) {}
-  virtual ~parser() = default;
+  explicit csv_parser(csv_parser_options options) : VW::details::input_parser("csv"), _options(options) {}
+  virtual ~csv_parser() = default;
 
-  static void set_parse_args(VW::config::option_group_definition& in_options, parser_options& parsed_options);
-  static void handle_parse_args(parser_options& parsed_options);
+  static void set_parse_args(VW::config::option_group_definition& in_options, csv_parser_options& parsed_options);
+  static void handle_parse_args(csv_parser_options& parsed_options);
 
   bool next(VW::workspace& all, io_buf& buf, VW::multi_ex& examples) override
   {
     return parse_csv(&all, examples[0], buf);
   }
 
-private:
   std::vector<std::string> _header_fn;
   std::vector<std::string> _header_ns;
-  size_t _anon;
   size_t _line_num = 0;
-  parser_options _options;
-  uint64_t _channel_hash;
-  std::vector<size_t> _label_list;
-  std::vector<size_t> _tag_list;
-  std::vector<size_t> _feature_list;
+  csv_parser_options _options;
+  VW::v_array<size_t> _label_list;
+  VW::v_array<size_t> _tag_list;
+  std::map<std::string, VW::v_array<size_t>> _feature_list;
 
+private:
   static void handling_csv_separator(std::string& str, const std::string& name);
-
   void reset();
   int parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf);
   size_t read_line(VW::workspace* all, VW::example* ae, io_buf& buf);
-  void parse_line(VW::workspace* all, VW::example* ae, VW::string_view csv_line);
-  void parse_example(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
-  void parse_label(VW::workspace* all, VW::example* ae, std::vector<std::string> csv_line);
-  void parse_tag(VW::example* ae, std::vector<std::string> csv_line);
-  void parse_namespaces(VW::workspace* all, example* ae, std::vector<std::string> csv_line);
-  void parse_features(VW::workspace* all, features& fs, VW::string_view feature_name,
-      VW::string_view string_feature_value, const char* ns);
-  std::vector<std::string> split(VW::string_view sv, const char ch, bool use_quotes = false);
-  void remove_quotation_marks(VW::string_view& sv);
-  std::string remove_quotation_marks(std::string s);
 };
-}  // namespace csv
 }  // namespace parsers
 }  // namespace VW

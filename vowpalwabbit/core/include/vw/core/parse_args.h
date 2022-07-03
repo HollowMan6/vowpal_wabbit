@@ -30,7 +30,7 @@ struct input_options
   bool chain_hash_json;
   bool flatbuffer = false;
 #ifdef BUILD_CSV
-  std::unique_ptr<VW::parsers::csv::parser_options> csv_opts;
+  std::unique_ptr<VW::parsers::csv_parser_options> csv_opts;
 #endif
 };
 
