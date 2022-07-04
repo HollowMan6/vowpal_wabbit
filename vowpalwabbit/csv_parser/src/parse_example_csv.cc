@@ -109,7 +109,7 @@ private:
   VW::parsers::csv_parser* _parser;
   VW::example* ae;
   VW::io::logger* logger;
-  std::vector<VW::string_view> csv_line;
+  VW::v_array<VW::string_view> csv_line;
   const char csv_separator;
   const bool csv_remove_outer_quotes;
   bool audit;
@@ -146,7 +146,7 @@ private:
 
         // Handle other column names as feature names
         // Seperate the feature name and namespace from the header.
-        std::vector<VW::string_view> splitted = split(csv_line[i], '|');
+        VW::v_array<VW::string_view> splitted = split(csv_line[i], '|');
         VW::string_view feature_name;
         VW::string_view ns;
         if (splitted.size() == 1) { feature_name = csv_line[i]; }
@@ -321,9 +321,9 @@ private:
     }
   }
 
-  inline FORCE_INLINE std::vector<VW::string_view> split(VW::string_view sv, const char ch, bool use_quotes = false)
+  inline FORCE_INLINE VW::v_array<VW::string_view> split(VW::string_view sv, const char ch, bool use_quotes = false)
   {
-    std::vector<VW::string_view> collections;
+    VW::v_array<VW::string_view> collections;
     size_t pointer = 0;
     // Trim extra characters that are useless for us to read
     const char* trim_list = "\r\n\xef\xbb\xbf\f\v";
