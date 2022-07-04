@@ -29,7 +29,15 @@ int parse_csv_examples(VW::workspace* all, io_buf& buf, VW::multi_ex& examples);
 class csv_parser : public VW::details::input_parser
 {
 public:
-  explicit csv_parser(csv_parser_options options) : VW::details::input_parser("csv"), _options(options) {}
+  std::vector<std::string> header_fn;
+  std::vector<std::string> header_ns;
+  size_t line_num = 0;
+  csv_parser_options options;
+  VW::v_array<size_t> label_list;
+  VW::v_array<size_t> tag_list;
+  std::map<std::string, VW::v_array<size_t>> feature_list;
+
+  explicit csv_parser(csv_parser_options options) : VW::details::input_parser("csv"), options(options) {}
   virtual ~csv_parser() = default;
 
   static void set_parse_args(VW::config::option_group_definition& in_options, csv_parser_options& parsed_options);
@@ -39,14 +47,6 @@ public:
   {
     return parse_csv(&all, examples[0], buf);
   }
-
-  std::vector<std::string> _header_fn;
-  std::vector<std::string> _header_ns;
-  size_t _line_num = 0;
-  csv_parser_options _options;
-  VW::v_array<size_t> _label_list;
-  VW::v_array<size_t> _tag_list;
-  std::map<std::string, VW::v_array<size_t>> _feature_list;
 
 private:
   static void handling_csv_separator(std::string& str, const std::string& name);
