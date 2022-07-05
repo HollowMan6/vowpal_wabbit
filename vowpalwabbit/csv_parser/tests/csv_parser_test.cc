@@ -11,16 +11,21 @@
 
 TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 {
+  /*
+   * Equivalent VW Text format:
+   * 1 2 'te"st,tst,"|sepal width:3.5 |sepal1 length:5.1 |petal length":1.4 |petal width:.2 | type:1
+   * 2 'te""st|sepal width:4.9 |petal length":3 |petal width:-1.4 | type:110 k:1 :-2
+   */
   std::string example_string =
       // Header
-      "\xef\xbb\xbf\"sepal1|length\"\tsepal|width\t\"petal|length\"\"\"\tpetal|width\t"
-      "_label\ttype\t_tag\t\"k\"\t\t\xef\xbb\xbf\n"
+      "\xef\xbb\xbf\"sepal1|length\",sepal|width,\"petal|length\"\"\",petal|width,"
+      "_label,type,_tag,\"k\",,\xef\xbb\xbf\n"
       // Example 1
-      "\f5.1\t3.5\t1.4\t.2\t1 2\t1\t\"'te\"\"st\ttst\t\"\"\"\t0\t\t\v\n"
+      "\f5.1,3.5,1.4,.2,1 2,1,\"'te\"\"st,tst,\"\"\",0,,\v\n"
       // Example 2
-      "\f0\t4.9\t3.0\t-1.4\t\"2\"\t0x6E\t'te\"\"st\t1.0\t-2\t\v";
+      "\f0,4.9,3.0,-1.4,\"2\",0x6E,'te\"\"st,1.0,-2,\v";
 
-  auto* vw = VW::initialize("--no_stdin --quiet -a --csv --csv_separator \\t", nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize("--no_stdin --quiet -a --csv", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
   VW::multi_ex examples;
@@ -34,11 +39,16 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_FLOAT_EQ(red_features_exp1.weight, 2.f);
   EXPECT_EQ(examples[0]->tag.size(), 11);
   std::string example1_tag = {examples[0]->tag.data(), examples[0]->tag.size()};
-  EXPECT_EQ(example1_tag, "te\"st\ttst\t\"");
+  // ' at the start should be removed
+  // CSV separators inside the double quotes sre all escaped
+  // The double quotes for escape should be removed
+  // Auto remove the outer quotes
+  EXPECT_EQ(example1_tag, "te\"st,tst,\"");
 
   // Check example 1 feature numbers
   EXPECT_EQ(examples[0]->feature_space['s'].size(), 2);
   EXPECT_EQ(examples[0]->feature_space['p'].size(), 2);
+  // Zero and empty values should be ignored
   EXPECT_EQ(examples[0]->feature_space[' '].size(), 1);
   EXPECT_EQ(examples[0]->feature_space['\''].size(), 0);
   EXPECT_EQ(examples[0]->feature_space['"'].size(), 0);
@@ -51,6 +61,7 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 
   // Check example 1 feature value
   EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[0], 3.5);
+  // \f\v should be trimmed
   EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[1], 5.1);
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 1.4);
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], 0.2);
@@ -59,9 +70,11 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   // Check example 1 namespace names and feature names
   EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].ns, "sepal");
   EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].name, "width");
+  // \xef\xbb\xbf\ should be trimmed
   EXPECT_EQ(examples[0]->feature_space['s'].space_names[1].ns, "sepal1");
   EXPECT_EQ(examples[0]->feature_space['s'].space_names[1].name, "length");
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].ns, "petal");
+  // The double quotes for escape should be removed
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].name, "length\"");
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[1].ns, "petal");
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[1].name, "width");
@@ -80,6 +93,7 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_FLOAT_EQ(red_features_exp2.weight, 1.f);
   EXPECT_EQ(examples[0]->tag.size(), 6);
   std::string example2_tag = {examples[0]->tag.data(), examples[0]->tag.size()};
+  // The double quotes appear outside the quotes (not for escape) should not be removed
   EXPECT_EQ(example2_tag, "te\"\"st");
 
   // Check example 2 feature numbers
@@ -99,6 +113,7 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[0], 4.9);
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 3);
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], -1.4);
+  // Should recognize 0x6E
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 110);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], -2);
@@ -123,16 +138,20 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 
 TEST(csv_parser_tests, test_multiple_file_examples)
 {
-  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\", nullptr, false, nullptr, nullptr);
+  /*
+   * Equivalent VW Text format:
+   * 4 a| a:1 b:2 c:3
+   */
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \t", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   VW::multi_ex examples;
 
   // Read the first file
   std::string file1_string =
       // Header
-      "a\\b\\c\\_label\\_tag\n"
+      "a\tb\tc\t_label\t_tag\n"
       // Example
-      "1\\2\\3\\4\\a\n";
+      "1\t2\t3\t4\ta\n";
   buffer.add_file(VW::io::create_buffer_view(file1_string.data(), file1_string.size()));
 
   examples.push_back(&VW::get_unused_example(vw));
@@ -151,11 +170,15 @@ TEST(csv_parser_tests, test_multiple_file_examples)
   examples.clear();
 
   // Read the second file
+  /*
+   * Equivalent VW Text format:
+   * 6 bc| d:5
+   */
   std::string file2_string =
       // Header
-      "_tag\\d\\_label\n"
+      "_tag\td\t_label\n"
       // Example
-      "bc\\5\\6\n";
+      "bc\t5\t6\n";
   buffer.add_file(VW::io::create_buffer_view(file2_string.data(), file2_string.size()));
 
   examples.push_back(&VW::get_unused_example(vw));
@@ -173,16 +196,22 @@ TEST(csv_parser_tests, test_multiple_file_examples)
 
 TEST(csv_parser_tests, test_multiclass_examples)
 {
+  /*
+   * Equivalent VW Text format:
+   * 1test | a:1 b:here c:3
+   * 2test | a:2 b:3.0is c:NaN
+   */
   std::string example_string =
       // Header
-      "a,b,_label,c\n"
+      "a;b;_label;c\n"
       // Example 1
-      "1,here,\"1test\",3.0\n"
+      "1;here;\"1test\";3.0\n"
       // Example 2
-      "2,is,2test,NaN\n";
+      "2;3.0is;2test;NaN\n";
 
-  auto* vw = VW::initialize(
-      "--no_stdin --quiet -a --csv --chain_hash --named_labels 2test,1test --oaa 2", nullptr, false, nullptr, nullptr);
+  auto* vw =
+      VW::initialize("--no_stdin --quiet -a --csv  --csv_separator ; --chain_hash --named_labels 2test,1test --oaa 2",
+          nullptr, false, nullptr, nullptr);
 
   io_buf buffer;
   buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
@@ -230,7 +259,8 @@ TEST(csv_parser_tests, test_multiclass_examples)
 
   // Check example 2 feature value
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 2);
-  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].str_value, "is");
+  // Test float parsing
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].str_value, "3.0is");
   EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].str_value, "NaN");
 
   // Check example 2 namespace names and feature names
