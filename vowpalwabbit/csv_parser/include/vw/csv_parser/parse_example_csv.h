@@ -9,7 +9,7 @@
 #include "vw/core/global_data.h"
 #include "vw/core/v_array.h"
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace VW
@@ -35,7 +35,7 @@ public:
   csv_parser_options options;
   VW::v_array<size_t> label_list;
   VW::v_array<size_t> tag_list;
-  std::map<std::string, VW::v_array<size_t>> feature_list;
+  std::unordered_map<std::string, VW::v_array<size_t>> feature_list;
 
   explicit csv_parser(csv_parser_options options) : VW::details::input_parser("csv"), options(options) {}
   virtual ~csv_parser() = default;

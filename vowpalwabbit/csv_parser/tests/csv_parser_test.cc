@@ -13,7 +13,7 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 {
   /*
    * Equivalent VW Text format:
-   * 1 2 'te"st,tst,"|sepal width:3.5 |sepal1 length:5.1 |petal length":1.4 |petal width:.2 | type:1
+   * 1 2 'te"st,tst,"|sepal1 length:5.1 |sepal width:3.5 |petal length":1.4 |petal width:0.2 | type:1
    * 2 'te""st|sepal width:4.9 |petal length":3 |petal width:-1.4 | type:110 k:1 :-2
    */
   std::string example_string =
@@ -60,19 +60,25 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_EQ(examples[0]->feature_space[' '].namespace_extents.size(), 1);
 
   // Check example 1 feature value
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[0], 3.5);
   // \f\v should be trimmed
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[1], 5.1);
+  EXPECT_TRUE((std::abs(examples[0]->feature_space['s'].values[0] - 5.1) < 0.01 &&
+                  std::abs(examples[0]->feature_space['s'].values[1] - 3.5) < 0.01) ||
+      (std::abs(examples[0]->feature_space['s'].values[0] - 3.5) < 0.01 &&
+          std::abs(examples[0]->feature_space['s'].values[1] - 5.1) < 0.01));
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 1.4);
   EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], 0.2);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
 
   // Check example 1 namespace names and feature names
-  EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].ns, "sepal");
-  EXPECT_EQ(examples[0]->feature_space['s'].space_names[0].name, "width");
   // \xef\xbb\xbf\ should be trimmed
-  EXPECT_EQ(examples[0]->feature_space['s'].space_names[1].ns, "sepal1");
-  EXPECT_EQ(examples[0]->feature_space['s'].space_names[1].name, "length");
+  EXPECT_TRUE((examples[0]->feature_space['s'].space_names[0].ns == "sepal1" &&
+                  examples[0]->feature_space['s'].space_names[0].name == "length" &&
+                  examples[0]->feature_space['s'].space_names[1].ns == "sepal" &&
+                  examples[0]->feature_space['s'].space_names[1].name == "width") ||
+      (examples[0]->feature_space['s'].space_names[0].ns == "sepal" &&
+          examples[0]->feature_space['s'].space_names[0].name == "width" &&
+          examples[0]->feature_space['s'].space_names[1].ns == "sepal1" &&
+          examples[0]->feature_space['s'].space_names[1].name == "length"));
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].ns, "petal");
   // The double quotes for escape should be removed
   EXPECT_EQ(examples[0]->feature_space['p'].space_names[0].name, "length\"");

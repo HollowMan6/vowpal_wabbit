@@ -380,7 +380,7 @@ private:
           }
           // This is a bit of a hack to expand string lifetime.
           _token_storage.emplace_back(new_string);
-          collections.emplace_back(_token_storage[_token_storage.size() - 1]);
+          collections.emplace_back(_token_storage.back());
         }
         unquoted_quotes_index.clear();
         if (i < sv.length() - 1) { pointer = i + 1; }
