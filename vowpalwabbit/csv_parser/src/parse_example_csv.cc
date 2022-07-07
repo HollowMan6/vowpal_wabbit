@@ -56,6 +56,26 @@ void csv_parser::set_parse_args(VW::config::option_group_definition& in_options,
                .default_value(",")
                .help("CSV Parser: Specify field separator in one character, "
                      "\" | : are not allowed for reservation.")
+               .experimental())
+      .add(VW::config::make_option("csv_no_header", parsed_options.csv_no_header)
+               .default_value(false)
+               .help("CSV Parser: First line is NOT a header. By default, CSV files "
+                     "are assumed to have a header with feature and/or namespaces names. "
+                     "You MUST specify the header with --csv_header if you use this option.")
+               .experimental())
+      .add(VW::config::make_option("csv_header", parsed_options.csv_header)
+               .default_value("")
+               .help("CSV Parser: Override the CSV header by providing (namespace, '|' and) "
+                     "feature name separated with ','. By default, CSV files are assumed to "
+                     "have a header with feature and/or namespaces names in the CSV first line. "
+                     "You can override it by specifying here. Combined with --csv_no_header, "
+                     "we assume that there is no header in the CSV file.")
+               .experimental())
+      .add(VW::config::make_option("csv_ns_value", parsed_options.csv_ns_value)
+               .default_value("")
+               .keep()
+               .help("CSV Parser: Scale the namespace values by specifying the float "
+                     "ratio. e.g. --csv_ns_value=a:0.5,b:0.3,:8 ")
                .experimental());
 }
 
@@ -71,6 +91,9 @@ void csv_parser::handle_parse_args(csv_parser_options& parsed_options)
       if (parsed_options.csv_separator[0] == csv_separator_forbid_chars[i])
       { THROW("Forbidden field separator used: " << parsed_options.csv_separator[0]); }
     }
+
+    if (parsed_options.csv_no_header && parsed_options.csv_header.empty())
+    { THROW("No header specified while --csv_no_header is set."); }
   }
 }
 
@@ -103,55 +126,41 @@ private:
   {
     bool this_line_is_header = false;
 
-    // Handle the headers
+    // Handle the headers and initialize the configuration
     if (_parser->header_fn.empty())
     {
-      this_line_is_header = true;
-
-      for (size_t i = 0; i < _csv_line.size(); i++)
+      if (_parser->options.csv_header.empty()) { parse_header(_csv_line); }
+      else
       {
-        if (_parser->options.csv_remove_outer_quotes) { remove_quotation_marks(_csv_line[i]); }
-
-        // Handle special column names
-        if (_csv_line[i] == "_tag" || _csv_line[i] == "_label")
-        {
-          // Handle the tag column
-          if (_csv_line[i] == "_tag") { _parser->tag_list.emplace_back(i); }
-          // Handle the label column
-          else if (_csv_line[i] == "_label")
-          {
-            _parser->label_list.emplace_back(i);
-          }
-
-          _parser->header_fn.emplace_back();
-          _parser->header_ns.emplace_back();
-          continue;
-        }
-
-        // Handle other column names as feature names
-        // Seperate the feature name and namespace from the header.
-        VW::v_array<VW::string_view> splitted = split(_csv_line[i], '|');
-        VW::string_view feature_name;
-        VW::string_view ns;
-        if (splitted.size() == 1) { feature_name = _csv_line[i]; }
-        else if (splitted.size() == 2)
-        {
-          ns = splitted[0];
-          feature_name = splitted[1];
-        }
-        else
-        {
-          THROW("Malformed header for feature name and namespace separator at cell " << i + 1 << ": " << _csv_line[i]);
-        }
-        _parser->header_fn.emplace_back(feature_name);
-        _parser->header_ns.emplace_back(ns);
-        _parser->feature_list[std::string{ns}].emplace_back(i);
+        VW::v_array<VW::string_view> header_elements = split(_parser->options.csv_header, ',');
+        parse_header(header_elements);
       }
 
-      if (_parser->label_list.empty())
+      if (!_parser->options.csv_no_header) { this_line_is_header = true; }
+
+      // Store the ns value from CmdLine
+      if (_parser->ns_value.empty() && !_parser->options.csv_ns_value.empty())
       {
-        _all->logger.err_warn(
-            "No '_label' column found in the CSV file, please ensure header exits in the first line!");
+        VW::v_array<VW::string_view> ns_values = split(_parser->options.csv_ns_value, ',', true);
+        for (size_t i = 0; i < ns_values.size(); i++)
+        {
+          VW::v_array<VW::string_view> pair = split(ns_values[i], ':', true);
+          std::string ns = " ";
+          float value = 1.f;
+          if (pair.size() != 2 || pair[1].empty())
+          { THROW("Malformed namespace value pair at cell " << i + 1 << ": " << ns_values[i]); }
+          else if (!pair[0].empty())
+          {
+            ns = std::string{pair[0]};
+          }
+
+          value = string_to_float(pair[1]);
+          if (std::isnan(value)) { THROW("NaN namespace value at cell " << i + 1 << ": " << ns_values[i]); }
+          else
+          {
+            _parser->ns_value[std::string{pair[0]}] = value;
+          }
+        }
       }
     }
 
@@ -164,6 +173,53 @@ private:
     {
       parse_example();
     }
+  }
+
+  inline FORCE_INLINE void parse_header(VW::v_array<VW::string_view>& header_elements)
+  {
+    for (size_t i = 0; i < header_elements.size(); i++)
+    {
+      if (_parser->options.csv_remove_outer_quotes) { remove_quotation_marks(header_elements[i]); }
+
+      // Handle special column names
+      if (header_elements[i] == "_tag" || header_elements[i] == "_label")
+      {
+        // Handle the tag column
+        if (header_elements[i] == "_tag") { _parser->tag_list.emplace_back(i); }
+        // Handle the label column
+        else if (header_elements[i] == "_label")
+        {
+          _parser->label_list.emplace_back(i);
+        }
+
+        _parser->header_fn.emplace_back();
+        _parser->header_ns.emplace_back();
+        continue;
+      }
+
+      // Handle other column names as feature names
+      // Seperate the feature name and namespace from the header.
+      VW::v_array<VW::string_view> splitted = split(header_elements[i], '|');
+      VW::string_view feature_name;
+      VW::string_view ns;
+      if (splitted.size() == 1) { feature_name = header_elements[i]; }
+      else if (splitted.size() == 2)
+      {
+        ns = splitted[0];
+        feature_name = splitted[1];
+      }
+      else
+      {
+        THROW("Malformed header for feature name and namespace separator at cell " << i + 1 << ": "
+                                                                                   << header_elements[i]);
+      }
+      _parser->header_fn.emplace_back(feature_name);
+      _parser->header_ns.emplace_back(ns);
+      _parser->feature_list[std::string{ns}].emplace_back(i);
+    }
+
+    if (_parser->label_list.empty())
+    { _all->logger.err_warn("No '_label' column found in the header/CSV first line!"); }
   }
 
   inline FORCE_INLINE void parse_example()
@@ -223,13 +279,19 @@ private:
       unsigned char _index = static_cast<unsigned char>(ns[0]);
       if (_ae->feature_space[_index].size() == 0) { new_index = true; }
 
+      float _cur_channel_v = 1.f;
+      if (!_parser->ns_value.empty())
+      {
+        auto it = _parser->ns_value.find(f.first);
+        if (it != _parser->ns_value.end()) { _cur_channel_v = it->second; }
+      }
       _ae->feature_space[_index].start_ns_extent(_channel_hash);
 
       for (size_t i = 0; i < f.second.size(); i++)
       {
         size_t column_index = f.second[i];
         empty_line = empty_line && _csv_line[column_index].empty();
-        parse_features(_ae->feature_space[_index], _parser->header_fn[column_index], _csv_line[column_index], ns);
+        parse_features(_ae->feature_space[_index], column_index, _cur_channel_v, ns);
       }
 
       _ae->feature_space[_index].end_ns_extent();
@@ -238,10 +300,10 @@ private:
     _ae->is_newline = empty_line;
   }
 
-  inline FORCE_INLINE void parse_features(
-      features& fs, VW::string_view feature_name, VW::string_view string_feature_value, VW::string_view ns)
+  inline FORCE_INLINE void parse_features(features& fs, size_t column_index, float cur_channel_v, VW::string_view ns)
   {
-    float _cur_channel_v = 1.f;
+    VW::string_view feature_name = _parser->header_fn[column_index];
+    VW::string_view string_feature_value = _csv_line[column_index];
 
     uint64_t word_hash;
     float _v;
@@ -253,21 +315,13 @@ private:
 
     if (string_feature_value[0] != '"')
     {
-      size_t end_read = 0;
-      parsed_feature_value =
-          parseFloat(string_feature_value.data(), end_read, string_feature_value.data() + string_feature_value.size());
-      is_feature_float = (end_read == string_feature_value.size());
-      if (std::isnan(parsed_feature_value))
-      {
-        _all->logger.err_warn("NaN value at CSV line {} for feature {} with namespace {} and value {}",
-            _parser->line_num, feature_name, ns, string_feature_value);
-        is_feature_float = false;
-      }
+      parsed_feature_value = string_to_float(string_feature_value);
+      if (!std::isnan(parsed_feature_value)) { is_feature_float = true; }
     }
 
     if (!is_feature_float && _parser->options.csv_remove_outer_quotes) { remove_quotation_marks(string_feature_value); }
 
-    if (is_feature_float) { _v = _cur_channel_v * parsed_feature_value; }
+    if (is_feature_float) { _v = cur_channel_v * parsed_feature_value; }
     else
     {
       _v = 1;
@@ -399,6 +453,15 @@ private:
       sv.remove_suffix(1);
     }
   }
+
+  inline FORCE_INLINE float string_to_float(VW::string_view sv)
+  {
+    size_t end_read = 0;
+    float parsed = parseFloat(sv.data(), end_read, sv.data() + sv.size());
+    // Not a valid float, return NaN
+    if (!(end_read == sv.size())) { parsed = std::numeric_limits<float>::quiet_NaN(); }
+    return parsed;
+  }
 };
 
 void csv_parser::reset()
@@ -414,7 +477,7 @@ void csv_parser::reset()
 int csv_parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
 {
   bool first_read = false;
-  if (header_fn.empty()) { first_read = true; }
+  if (header_fn.empty() && !options.csv_no_header) { first_read = true; }
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
   // Read the data if it's first read as what just read is header.

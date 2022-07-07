@@ -21,6 +21,9 @@ struct csv_parser_options
   bool enabled = false;
   // CSV parsing configurations
   std::string csv_separator = ",";
+  bool csv_no_header = false;
+  std::string csv_header = "";
+  std::string csv_ns_value = "";
   bool csv_remove_outer_quotes = true;
 };
 
@@ -36,6 +39,7 @@ public:
   VW::v_array<size_t> label_list;
   VW::v_array<size_t> tag_list;
   std::unordered_map<std::string, VW::v_array<size_t>> feature_list;
+  std::unordered_map<std::string, float> ns_value;
 
   explicit csv_parser(csv_parser_options options) : VW::details::input_parser("csv"), options(options) {}
   virtual ~csv_parser() = default;

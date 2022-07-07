@@ -13,8 +13,8 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
 {
   /*
    * Equivalent VW Text format:
-   * 1 2 'te"st,tst,"|sepal1 length:5.1 |sepal width:3.5 |petal length":1.4 |petal width:0.2 | type:1
-   * 2 'te""st|sepal width:4.9 |petal length":3 |petal width:-1.4 | type:110 k:1 :-2
+   * 1 2 'te"st,tst,"|sepal1 length:5.1 |sepal:-2.2 width:3.5 |petal:2 length":1.4 width:0.2 | type:1
+   * 2 'te""st|sepal:-2.2 width:4.9 |petal:2 length":3 width:-1.4 | type:110 k:1 :-2
    */
   std::string example_string =
       // Header
@@ -25,7 +25,8 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
       // Example 2
       "\f0,4.9,3.0,-1.4,\"2\",0x6E,'te\"\"st,1.0,-2,\v";
 
-  auto* vw = VW::initialize("--no_stdin --quiet -a --csv", nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize(
+      "--no_stdin --quiet -a --csv --csv_ns_value sepal:-2.2,petal:2,sepal1:1", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
   VW::multi_ex examples;
@@ -62,11 +63,11 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   // Check example 1 feature value
   // \f\v should be trimmed
   EXPECT_TRUE((std::abs(examples[0]->feature_space['s'].values[0] - 5.1) < 0.01 &&
-                  std::abs(examples[0]->feature_space['s'].values[1] - 3.5) < 0.01) ||
-      (std::abs(examples[0]->feature_space['s'].values[0] - 3.5) < 0.01 &&
+                  std::abs(examples[0]->feature_space['s'].values[1] + 7.7) < 0.01) ||
+      (std::abs(examples[0]->feature_space['s'].values[0] + 7.7) < 0.01 &&
           std::abs(examples[0]->feature_space['s'].values[1] - 5.1) < 0.01));
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 1.4);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], 0.2);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 2.8);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], 0.4);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
 
   // Check example 1 namespace names and feature names
@@ -116,9 +117,9 @@ TEST(csv_parser_tests, test_complex_csv_simple_label_examples)
   EXPECT_EQ(examples[0]->feature_space[' '].namespace_extents.size(), 1);
 
   // Check example 2 feature value
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[0], 4.9);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 3);
-  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], -1.4);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['s'].values[0], -10.78);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[0], 6);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['p'].values[1], -2.8);
   // Should recognize 0x6E
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 110);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 1);
@@ -148,7 +149,7 @@ TEST(csv_parser_tests, test_multiple_file_examples)
    * Equivalent VW Text format:
    * 4 a| a:1 b:2 c:3
    */
-  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \t", nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_separator \\t", nullptr, false, nullptr, nullptr);
   io_buf buffer;
   VW::multi_ex examples;
 
@@ -170,6 +171,9 @@ TEST(csv_parser_tests, test_multiple_file_examples)
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 2);
   EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], 3);
+  // Empty as not in audit mode
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names.size(), 0);
+
   VW::finish_example(*vw, *examples[0]);
 
   EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 0);
@@ -216,7 +220,7 @@ TEST(csv_parser_tests, test_multiclass_examples)
       "2;3.0is;2test;NaN\n";
 
   auto* vw =
-      VW::initialize("--no_stdin --quiet -a --csv  --csv_separator ; --chain_hash --named_labels 2test,1test --oaa 2",
+      VW::initialize("--no_stdin --quiet -a --csv --csv_separator ; --chain_hash --named_labels 2test,1test --oaa 2",
           nullptr, false, nullptr, nullptr);
 
   io_buf buffer;
@@ -227,7 +231,7 @@ TEST(csv_parser_tests, test_multiclass_examples)
   EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
 
   // Check example 1 label
-  EXPECT_FLOAT_EQ(examples[0]->l.multi.label, 2);
+  EXPECT_EQ(examples[0]->l.multi.label, 2);
 
   // Check example 1 feature numbers
   EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
@@ -255,7 +259,7 @@ TEST(csv_parser_tests, test_multiclass_examples)
   EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
 
   // Check example 1 label
-  EXPECT_FLOAT_EQ(examples[0]->l.multi.label, 1);
+  EXPECT_EQ(examples[0]->l.multi.label, 1);
 
   // Check example 2 feature numbers
   EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
@@ -276,6 +280,107 @@ TEST(csv_parser_tests, test_multiclass_examples)
   EXPECT_EQ(examples[0]->feature_space[' '].space_names[1].name, "b");
   EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].ns, " ");
   EXPECT_EQ(examples[0]->feature_space[' '].space_names[2].name, "c");
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_replace_header)
+{
+  /*
+   * Equivalent VW Text format:
+   * 3 | :1 :2 :4
+   */
+  std::string example_string =
+      // Header
+      "a$b$_label$c\n"
+      // Example 1
+      "1$2$3$4\n";
+
+  auto* vw = VW::initialize(
+      "--no_stdin --quiet --csv --csv_separator $ --csv_header ,,_label,", nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+
+  // Check example 1 label
+  EXPECT_FLOAT_EQ(examples[0]->l.simple.label, 3.f);
+  const auto& red_features_exp1 = examples[0]->_reduction_features.template get<simple_label_reduction_features>();
+  EXPECT_FLOAT_EQ(red_features_exp1.weight, 1.f);
+
+  // Check example 1 feature numbers
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 3);
+  EXPECT_EQ(examples[0]->feature_space['$'].size(), 0);
+
+  // Check example 1 namespace numbers
+  EXPECT_EQ(examples[0]->feature_space[' '].namespace_extents.size(), 1);
+
+  // Check example 1 feature value
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 1);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[1], 2);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[2], 4);
+
+  // Check example 1 feature hash
+  EXPECT_EQ(examples[0]->feature_space[' '].indices[0], 0);
+  EXPECT_EQ(examples[0]->feature_space[' '].indices[1], 1);
+  EXPECT_EQ(examples[0]->feature_space[' '].indices[2], 2);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_no_header)
+{
+  /*
+   * Equivalent VW Text format:
+   * 3 |n1 a:1 b:3 | a:4
+   */
+  std::string example_string =
+      // Example 1
+      "1&2&3&4\n";
+
+  auto* vw =
+      VW::initialize("--no_stdin --quiet -a --csv --csv_separator & --csv_no_header --csv_header n1|a,_label,n1|b,a",
+          nullptr, false, nullptr, nullptr);
+
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_EQ(vw->example_parser->reader(vw, buffer, examples), 1);
+
+  // Check example 1 label
+  EXPECT_FLOAT_EQ(examples[0]->l.simple.label, 2.f);
+  const auto& red_features_exp1 = examples[0]->_reduction_features.template get<simple_label_reduction_features>();
+  EXPECT_FLOAT_EQ(red_features_exp1.weight, 1.f);
+
+  // Check example 1 feature numbers
+  EXPECT_EQ(examples[0]->feature_space['n'].size(), 2);
+  EXPECT_EQ(examples[0]->feature_space[' '].size(), 1);
+  EXPECT_EQ(examples[0]->feature_space['&'].size(), 0);
+
+  // Check example 1 namespace numbers
+  EXPECT_EQ(examples[0]->feature_space['n'].namespace_extents.size(), 1);
+
+  // Check example 1 feature value
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['n'].values[0], 1);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space['n'].values[1], 3);
+  EXPECT_FLOAT_EQ(examples[0]->feature_space[' '].values[0], 4);
+
+  // Check example 1 namespace names and feature names
+  EXPECT_EQ(examples[0]->feature_space['n'].space_names[0].ns, "n1");
+  EXPECT_EQ(examples[0]->feature_space['n'].space_names[0].name, "a");
+  EXPECT_EQ(examples[0]->feature_space['n'].space_names[1].ns, "n1");
+  EXPECT_EQ(examples[0]->feature_space['n'].space_names[1].name, "b");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].ns, " ");
+  EXPECT_EQ(examples[0]->feature_space[' '].space_names[0].name, "a");
+  // Hash check, different due to different namespaces
+  EXPECT_TRUE(examples[0]->feature_space['n'].indices[0] != examples[0]->feature_space[' '].values[0]);
 
   VW::finish_example(*vw, *examples[0]);
   VW::finish(*vw);
@@ -339,6 +444,68 @@ TEST(csv_parser_tests, test_multicharacter_csv_separator_error_thrown)
 {
   EXPECT_THROW(VW::initialize("--no_stdin --quiet --csv --csv_separator \\a", nullptr, false, nullptr, nullptr),
       VW::vw_exception);
+}
+
+TEST(csv_parser_tests, test_no_header_without_specifying_error_thrown)
+{
+  EXPECT_THROW(
+      VW::initialize("--no_stdin --quiet --csv --csv_no_header", nullptr, false, nullptr, nullptr), VW::vw_exception);
+}
+
+TEST(csv_parser_tests, test_malformed_namespace_value_pair_no_element_error_thrown)
+{
+  std::string example_string = " \n";
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_ns_value :5,", nullptr, false, nullptr, nullptr);
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_malformed_namespace_value_pair_one_element_error_thrown)
+{
+  std::string example_string = " \n";
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_ns_value a:5,0", nullptr, false, nullptr, nullptr);
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_malformed_namespace_value_pair_three_element_error_thrown)
+{
+  std::string example_string = " \n";
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_ns_value c:5,b:a:6", nullptr, false, nullptr, nullptr);
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
+}
+
+TEST(csv_parser_tests, test_nan_namespace_value_error_thrown)
+{
+  std::string example_string = " \n";
+  auto* vw = VW::initialize("--no_stdin --quiet --csv --csv_ns_value c:a", nullptr, false, nullptr, nullptr);
+  io_buf buffer;
+  buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
+  VW::multi_ex examples;
+  examples.push_back(&VW::get_unused_example(vw));
+  EXPECT_THROW(vw->example_parser->reader(vw, buffer, examples), VW::vw_exception);
+
+  VW::finish_example(*vw, *examples[0]);
+  VW::finish(*vw);
 }
 
 TEST(csv_parser_tests, test_malformed_header_error_thrown)
