@@ -343,9 +343,9 @@ TEST(csv_parser_tests, test_no_header)
       // Example 1
       "1&2&3&4\n";
 
-  auto* vw =
-      VW::initialize("--no_stdin --quiet -a --csv --csv_separator & --csv_no_header --csv_header n1|a,_label,n1|b,a",
-          nullptr, false, nullptr, nullptr);
+  auto* vw = VW::initialize(
+      "--no_stdin --quiet -a --csv --csv_separator & --csv_no_file_header --csv_header n1|a,_label,n1|b,a", nullptr,
+      false, nullptr, nullptr);
 
   io_buf buffer;
   buffer.add_file(VW::io::create_buffer_view(example_string.data(), example_string.size()));
@@ -448,8 +448,8 @@ TEST(csv_parser_tests, test_multicharacter_csv_separator_error_thrown)
 
 TEST(csv_parser_tests, test_no_header_without_specifying_error_thrown)
 {
-  EXPECT_THROW(
-      VW::initialize("--no_stdin --quiet --csv --csv_no_header", nullptr, false, nullptr, nullptr), VW::vw_exception);
+  EXPECT_THROW(VW::initialize("--no_stdin --quiet --csv --csv_no_file_header", nullptr, false, nullptr, nullptr),
+      VW::vw_exception);
 }
 
 TEST(csv_parser_tests, test_malformed_namespace_value_pair_no_element_error_thrown)

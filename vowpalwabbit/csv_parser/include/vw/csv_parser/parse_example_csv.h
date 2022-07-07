@@ -21,7 +21,7 @@ struct csv_parser_options
   bool enabled = false;
   // CSV parsing configurations
   std::string csv_separator = ",";
-  bool csv_no_header = false;
+  bool csv_no_file_header = false;
   std::string csv_header = "";
   std::string csv_ns_value = "";
   bool csv_remove_outer_quotes = true;

@@ -57,7 +57,7 @@ void csv_parser::set_parse_args(VW::config::option_group_definition& in_options,
                .help("CSV Parser: Specify field separator in one character, "
                      "\" | : are not allowed for reservation.")
                .experimental())
-      .add(VW::config::make_option("csv_no_header", parsed_options.csv_no_header)
+      .add(VW::config::make_option("csv_no_file_header", parsed_options.csv_no_file_header)
                .default_value(false)
                .help("CSV Parser: First line is NOT a header. By default, CSV files "
                      "are assumed to have a header with feature and/or namespaces names. "
@@ -68,7 +68,7 @@ void csv_parser::set_parse_args(VW::config::option_group_definition& in_options,
                .help("CSV Parser: Override the CSV header by providing (namespace, '|' and) "
                      "feature name separated with ','. By default, CSV files are assumed to "
                      "have a header with feature and/or namespaces names in the CSV first line. "
-                     "You can override it by specifying here. Combined with --csv_no_header, "
+                     "You can override it by specifying here. Combined with --csv_no_file_header, "
                      "we assume that there is no header in the CSV file.")
                .experimental())
       .add(VW::config::make_option("csv_ns_value", parsed_options.csv_ns_value)
@@ -92,8 +92,8 @@ void csv_parser::handle_parse_args(csv_parser_options& parsed_options)
       { THROW("Forbidden field separator used: " << parsed_options.csv_separator[0]); }
     }
 
-    if (parsed_options.csv_no_header && parsed_options.csv_header.empty())
-    { THROW("No header specified while --csv_no_header is set."); }
+    if (parsed_options.csv_no_file_header && parsed_options.csv_header.empty())
+    { THROW("No header specified while --csv_no_file_header is set."); }
   }
 }
 
@@ -136,7 +136,7 @@ private:
         parse_header(header_elements);
       }
 
-      if (!_parser->options.csv_no_header) { this_line_is_header = true; }
+      if (!_parser->options.csv_no_file_header) { this_line_is_header = true; }
 
       // Store the ns value from CmdLine
       if (_parser->ns_value.empty() && !_parser->options.csv_ns_value.empty())
@@ -477,7 +477,7 @@ void csv_parser::reset()
 int csv_parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
 {
   bool first_read = false;
-  if (header_fn.empty() && !options.csv_no_header) { first_read = true; }
+  if (header_fn.empty() && !options.csv_no_file_header) { first_read = true; }
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
   // Read the data if it's first read as what just read is header.
