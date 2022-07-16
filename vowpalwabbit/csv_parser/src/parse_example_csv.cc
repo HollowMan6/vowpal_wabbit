@@ -73,7 +73,6 @@ void csv_parser::set_parse_args(VW::config::option_group_definition& in_options,
                .experimental())
       .add(VW::config::make_option("csv_ns_value", parsed_options.csv_ns_value)
                .default_value("")
-               .keep()
                .help("CSV Parser: Scale the namespace values by specifying the float "
                      "ratio. e.g. --csv_ns_value=a:0.5,b:0.3,:8 ")
                .experimental());
@@ -103,7 +102,6 @@ public:
   CSV_parser(VW::workspace* all, VW::example* ae, VW::string_view csv_line, VW::parsers::csv_parser* parser)
       : _parser(parser), _all(all), _ae(ae)
   {
-    _parser->line_num++;
     if (csv_line.empty()) { THROW("Malformed CSV, empty line at " << _parser->line_num << "!"); }
     else
     {
@@ -139,29 +137,7 @@ private:
       if (!_parser->options.csv_no_file_header) { this_line_is_header = true; }
 
       // Store the ns value from CmdLine
-      if (_parser->ns_value.empty() && !_parser->options.csv_ns_value.empty())
-      {
-        VW::v_array<VW::string_view> ns_values = split(_parser->options.csv_ns_value, ',', true);
-        for (size_t i = 0; i < ns_values.size(); i++)
-        {
-          VW::v_array<VW::string_view> pair = split(ns_values[i], ':', true);
-          std::string ns = " ";
-          float value = 1.f;
-          if (pair.size() != 2 || pair[1].empty())
-          { THROW("Malformed namespace value pair at cell " << i + 1 << ": " << ns_values[i]); }
-          else if (!pair[0].empty())
-          {
-            ns = std::string{pair[0]};
-          }
-
-          value = string_to_float(pair[1]);
-          if (std::isnan(value)) { THROW("NaN namespace value at cell " << i + 1 << ": " << ns_values[i]); }
-          else
-          {
-            _parser->ns_value[std::string{pair[0]}] = value;
-          }
-        }
-      }
+      if (_parser->ns_value.empty() && !_parser->options.csv_ns_value.empty()) { parse_ns_value(); }
     }
 
     if (_csv_line.size() != _parser->header_fn.size())
@@ -172,6 +148,30 @@ private:
     else if (!this_line_is_header)
     {
       parse_example();
+    }
+  }
+
+  inline FORCE_INLINE void parse_ns_value()
+  {
+    VW::v_array<VW::string_view> ns_values = split(_parser->options.csv_ns_value, ',', true);
+    for (size_t i = 0; i < ns_values.size(); i++)
+    {
+      VW::v_array<VW::string_view> pair = split(ns_values[i], ':', true);
+      std::string ns = " ";
+      float value = 1.f;
+      if (pair.size() != 2 || pair[1].empty())
+      { THROW("Malformed namespace value pair at cell " << i + 1 << ": " << ns_values[i]); }
+      else if (!pair[0].empty())
+      {
+        ns = std::string{pair[0]};
+      }
+
+      value = string_to_float(pair[1]);
+      if (std::isnan(value)) { THROW("NaN namespace value at cell " << i + 1 << ": " << ns_values[i]); }
+      else
+      {
+        _parser->ns_value[std::string{pair[0]}] = value;
+      }
     }
   }
 
@@ -466,22 +466,23 @@ private:
 
 void csv_parser::reset()
 {
-  header_fn.clear();
-  header_ns.clear();
+  if (options.csv_header.empty())
+  {
+    header_fn.clear();
+    header_ns.clear();
+    label_list.clear();
+    tag_list.clear();
+    feature_list.clear();
+  }
   line_num = 0;
-  label_list.clear();
-  tag_list.clear();
-  feature_list.clear();
 }
 
 int csv_parser::parse_csv(VW::workspace* all, VW::example* ae, io_buf& buf)
 {
-  bool first_read = false;
-  if (header_fn.empty() && !options.csv_no_file_header) { first_read = true; }
   // This function consumes input until it reaches a '\n' then it walks back the '\n' and '\r' if it exists.
   size_t num_bytes_consumed = read_line(all, ae, buf);
-  // Read the data if it's first read as what just read is header.
-  if (first_read) { num_bytes_consumed += read_line(all, ae, buf); }
+  // Read the data again if what just read is header.
+  if (line_num == 1 && !options.csv_no_file_header) { num_bytes_consumed += read_line(all, ae, buf); }
   return static_cast<int>(num_bytes_consumed);
 }
 
@@ -501,6 +502,7 @@ size_t csv_parser::read_line(VW::workspace* all, VW::example* ae, io_buf& buf)
     if (num_chars > 0 && line[num_chars - 1] == '\n') { num_chars--; }
     if (num_chars > 0 && line[num_chars - 1] == '\r') { num_chars--; }
 
+    line_num++;
     VW::string_view csv_line(line, num_chars);
     CSV_parser parse_line(all, ae, csv_line, this);
   }
