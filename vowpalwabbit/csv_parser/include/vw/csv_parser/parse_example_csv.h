@@ -10,6 +10,7 @@
 #include "vw/core/v_array.h"
 
 #include <map>
+#include <utility>
 #include <vector>
 
 namespace VW
@@ -38,7 +39,7 @@ class parser : public VW::details::input_parser
 {
 public:
   explicit parser(parser_options options, VW::io::logger logger_)
-      : VW::details::input_parser("csv"), _options(options), logger(std::move(logger_))
+      : VW::details::input_parser("csv"), _options(std::move(options)), logger(std::move(logger_))
   {
   }
   virtual ~parser() = default;
